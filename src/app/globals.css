@@ -1,0 +1,112 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-background: #ffffff;
+  --color-foreground: #111827;
+  --color-muted: #6b7280;
+  --color-border: #e5e7eb;
+  --color-card: #ffffff;
+  --color-sidebar: #f9fafb;
+  --color-hover: #f9fafb;
+  --color-selected: #eff6ff;
+  --color-primary: #2563eb;
+  --color-primary-hover: #1d4ed8;
+  --color-success-bg: #dcfce7;
+  --color-success-text: #166534;
+  --color-success-border: #bbf7d0;
+  --color-warning-bg: #fef3c7;
+  --color-warning-text: #92400e;
+  --color-warning-border: #fde68a;
+  --color-info-bg: #dbeafe;
+  --color-info-text: #1e40af;
+  --color-info-border: #bfdbfe;
+  --color-danger-bg: #fee2e2;
+  --color-danger-text: #991b1b;
+  --color-danger-border: #fecaca;
+  --color-neutral-bg: #f3f4f6;
+  --color-neutral-text: #374151;
+  --color-neutral-border: #d1d5db;
+  --color-claim-bg: #e0e7ff;
+  --color-claim-text: #3730a3;
+  --color-claim-border: #c7d2fe;
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'SF Mono', 'Courier New', monospace;
+}
+
+body {
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Status pill component */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 9999px;
+  border-width: 1px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* Scrollbar styles */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+/* Table row hover */
+.table-row-interactive {
+  transition: background-color 0.1s ease;
+}
+.table-row-interactive:hover {
+  background-color: #f9fafb;
+}
+
+/* Animation for success checkmark */
+@keyframes checkmark-draw {
+  from { stroke-dashoffset: 100; }
+  to { stroke-dashoffset: 0; }
+}
+.animate-checkmark {
+  animation: checkmark-draw 0.5s ease-out forwards;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}

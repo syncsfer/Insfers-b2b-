@@ -1,0 +1,86 @@
+'use client';
+
+import { usePathname } from 'next/navigation';
+import Link from 'next/link';
+import {
+  LayoutDashboard, CreditCard, RotateCcw, Users, LinkIcon,
+  FileText, BarChart3, Code2, Settings, Zap, TestTube,
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+const navItems = [
+  { label: 'Home', href: '/dashboard', icon: LayoutDashboard },
+  { label: 'Payments', href: '/dashboard/payments', icon: CreditCard },
+  { label: 'Refunds', href: '/dashboard/refunds', icon: RotateCcw },
+  { label: 'Customers', href: '/dashboard/customers', icon: Users },
+  { label: 'Payment Links', href: '/dashboard/payment-links', icon: LinkIcon },
+  { label: 'Invoices', href: '/dashboard/invoices', icon: FileText },
+  { label: 'Reporting', href: '/dashboard/reporting', icon: BarChart3 },
+  { label: 'Developers', href: '/dashboard/developer', icon: Code2 },
+  { label: 'Settings', href: '/dashboard/settings', icon: Settings },
+];
+
+export function Sidebar() {
+  const pathname = usePathname();
+
+  return (
+    <aside className="w-[240px] h-screen bg-sidebar border-r border-border flex flex-col fixed left-0 top-0 z-40">
+      {/* Logo */}
+      <div className="h-16 flex items-center px-5 border-b border-border">
+        <Link href="/dashboard" className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
+            <Zap size={16} className="text-white" />
+          </div>
+          <span className="text-[15px] font-bold text-gray-900">Chain Payments</span>
+        </Link>
+      </div>
+
+      {/* Mode toggle */}
+      <div className="px-3 pt-3 pb-1">
+        <div className="flex items-center gap-1 p-0.5 bg-gray-100 rounded-lg">
+          <button className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-white shadow-sm text-gray-900">
+            <Zap size={12} /> Live
+          </button>
+          <button className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md text-gray-500 hover:text-gray-700">
+            <TestTube size={12} /> Test
+          </button>
+        </div>
+      </div>
+
+      {/* Navigation */}
+      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+        {navItems.map((item) => {
+          const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href));
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                'flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors',
+                isActive
+                  ? 'bg-blue-50 text-blue-700'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100',
+              )}
+            >
+              <item.icon size={18} strokeWidth={isActive ? 2 : 1.5} />
+              {item.label}
+            </Link>
+          );
+        })}
+      </nav>
+
+      {/* Footer */}
+      <div className="px-3 py-4 border-t border-border">
+        <div className="flex items-center gap-3 px-3 py-2">
+          <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 text-xs font-bold">
+            AC
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-gray-900 truncate">Acme Corp</p>
+            <p className="text-[11px] text-gray-500 truncate">admin@acme.com</p>
+          </div>
+        </div>
+      </div>
+    </aside>
+  );
+}
