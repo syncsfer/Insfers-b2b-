@@ -5,7 +5,7 @@ import Link from 'next/link';
 import {
   LayoutDashboard, CreditCard, RotateCcw, Users, LinkIcon,
   FileText, BarChart3, Code2, Settings, Zap, TestTube,
-  ShieldCheck, RefreshCw, GitBranch,
+  ShieldCheck, RefreshCw, GitBranch, ArrowLeftRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -16,6 +16,7 @@ const navItems = [
   { label: 'Holds', href: '/dashboard/holds', icon: ShieldCheck },
   { label: 'Subscriptions', href: '/dashboard/subscriptions', icon: RefreshCw },
   { label: 'Connect', href: '/dashboard/connect', icon: GitBranch },
+  { label: 'Bridge', href: '/dashboard/bridge', icon: ArrowLeftRight },
   { label: 'Customers', href: '/dashboard/customers', icon: Users },
   { label: 'Payment Links', href: '/dashboard/payment-links', icon: LinkIcon },
   { label: 'Invoices', href: '/dashboard/invoices', icon: FileText },
