@@ -7,6 +7,7 @@ export type Chain = 'base' | 'ethereum' | 'polygon' | 'arbitrum' | 'optimism';
 export type HoldStatus = 'active' | 'captured' | 'released' | 'expired';
 export type SubscriptionStatus = 'active' | 'past_due' | 'canceled' | 'expired' | 'trialing';
 export type ConnectedAccountStatus = 'onboarding' | 'active' | 'suspended';
+export type PayoutStatus = 'pending' | 'processing' | 'completed' | 'failed';
 
 export interface PaymentIntent {
   id: string;
@@ -158,6 +159,48 @@ export interface Subscription {
   retry_count: number;
   max_retries: number;
   created_at: string;
+}
+
+export interface Plan {
+  id: string;
+  merchant_address: string;
+  name: string;
+  amount: number;
+  interval: 'week' | 'month' | 'year';
+  interval_seconds: number;
+  trial_days: number;
+  grace_period: number;
+  max_retries: number;
+  active: boolean;
+  subscriber_count: number;
+  created_at: string;
+}
+
+export interface ConnectedAccount {
+  id: string;
+  wallet_address: string;
+  settlement_wallet: string;
+  label: string;
+  status: ConnectedAccountStatus;
+  total_received: number;
+  split_count: number;
+  created_at: string;
+}
+
+export interface SplitRule {
+  recipient: string;
+  bps: number;
+  flat: number;
+}
+
+export interface Payout {
+  id: string;
+  recipient_address: string;
+  amount: number;
+  status: PayoutStatus;
+  tx_hash: string | null;
+  created_at: string;
+  completed_at: string | null;
 }
 
 export interface DashboardKPIs {

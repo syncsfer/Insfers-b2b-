@@ -8,42 +8,8 @@ import { DataTable, type Column } from '@/components/ui/data-table';
 import { Modal } from '@/components/ui/modal';
 import { useToast } from '@/components/ui/toast';
 import { formatUSDC, formatRelativeTime } from '@/lib/utils';
-import type { HoldStatus } from '@/types';
-
-interface HoldItem {
-  id: string;
-  amount: number;
-  captured_amount: number;
-  released_amount: number;
-  status: HoldStatus;
-  customer_address: string;
-  customer_email: string | null;
-  expires_at: string;
-  created_at: string;
-}
-
-const mockHolds: HoldItem[] = Array.from({ length: 12 }, (_, i) => {
-  const amount = Math.floor(Math.random() * 200000) + 10000;
-  const statuses: HoldStatus[] = ['active', 'active', 'captured', 'released', 'expired'];
-  const status = statuses[Math.floor(Math.random() * statuses.length)];
-  const captured = status === 'captured' ? amount : status === 'active' ? Math.floor(amount * Math.random() * 0.5) : 0;
-  const released = status === 'released' ? amount : 0;
-  const d = new Date();
-  d.setDate(d.getDate() - Math.floor(Math.random() * 14));
-  const exp = new Date(d);
-  exp.setDate(exp.getDate() + 7);
-  return {
-    id: `hold_${String(i + 1).padStart(3, '0')}`,
-    amount,
-    captured_amount: captured,
-    released_amount: released,
-    status,
-    customer_address: `0x${Math.random().toString(16).slice(2, 42).padEnd(40, '0')}`,
-    customer_email: Math.random() > 0.4 ? `user${i}@example.com` : null,
-    expires_at: exp.toISOString(),
-    created_at: d.toISOString(),
-  };
-});
+import { mockHolds } from '@/lib/mock-data';
+import type { HoldStatus, Hold } from '@/types';
 
 const tabs: { label: string; value: HoldStatus | 'all' }[] = [
   { label: 'All', value: 'all' as HoldStatus | 'all' },
@@ -56,8 +22,8 @@ const tabs: { label: string; value: HoldStatus | 'all' }[] = [
 export default function HoldsPage() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<HoldStatus | 'all'>('all');
-  const [captureModal, setCaptureModal] = useState<HoldItem | null>(null);
-  const [releaseModal, setReleaseModal] = useState<HoldItem | null>(null);
+  const [captureModal, setCaptureModal] = useState<Hold | null>(null);
+  const [releaseModal, setReleaseModal] = useState<Hold | null>(null);
   const [captureAmount, setCaptureAmount] = useState('');
   const [releaseConfirm, setReleaseConfirm] = useState(false);
 
@@ -72,7 +38,7 @@ export default function HoldsPage() {
     return c;
   }, []);
 
-  const getRemaining = (h: HoldItem) => h.amount - h.captured_amount - h.released_amount;
+  const getRemaining = (h: Hold) => h.amount - h.captured_amount - h.released_amount;
 
   const getTimeLeft = (expiresAt: string) => {
     const diff = new Date(expiresAt).getTime() - Date.now();
@@ -83,12 +49,12 @@ export default function HoldsPage() {
     return `${hours}h ${mins}m`;
   };
 
-  const columns: Column<HoldItem>[] = [
+  const columns: Column<Hold>[] = [
     { key: 'status', header: 'Status', width: '110px', render: (h) => <StatusPill status={h.status} size="sm" /> },
     { key: 'amount', header: 'Amount', width: '100px', align: 'right', render: (h) => <span className="font-semibold text-gray-900">{formatUSDC(h.amount)}</span> },
     { key: 'captured', header: 'Captured', width: '100px', align: 'right', render: (h) => <span className="text-sm text-gray-600">{formatUSDC(h.captured_amount)}</span> },
     { key: 'remaining', header: 'Remaining', width: '100px', align: 'right', render: (h) => <span className="text-sm font-medium text-gray-900">{formatUSDC(getRemaining(h))}</span> },
-    { key: 'customer', header: 'Customer', width: '160px', render: (h) => <WalletChip address={h.customer_address} showExplorer={false} /> },
+    { key: 'customer', header: 'Customer', width: '160px', render: (h) => <WalletChip address={h.from_address} showExplorer={false} /> },
     {
       key: 'expires', header: 'Expires In', width: '110px',
       render: (h) => {
@@ -201,7 +167,7 @@ export default function HoldsPage() {
         {releaseModal && (
           <div className="space-y-4">
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-              <p className="text-sm text-amber-800">Funds will be returned to customer <span className="font-mono">{releaseModal.customer_address.slice(0, 10)}...</span></p>
+              <p className="text-sm text-amber-800">Funds will be returned to customer <span className="font-mono">{releaseModal.from_address.slice(0, 10)}...</span></p>
             </div>
             <div className="bg-gray-50 rounded-lg p-4 text-sm">
               <div className="flex justify-between"><span className="text-gray-500">Amount to release</span><span className="font-semibold">{formatUSDC(getRemaining(releaseModal))}</span></div>

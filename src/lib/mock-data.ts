@@ -1,7 +1,7 @@
 import type {
   PaymentIntent, Refund, Customer, PaymentLink, Invoice,
   WebhookEndpoint, ApiKey, WebhookLog, TimelineEvent, DashboardKPIs,
-  Chain,
+  Chain, Hold, Subscription, Plan, ConnectedAccount, Payout,
 } from '@/types';
 
 const chains: Chain[] = ['base', 'ethereum', 'polygon', 'arbitrum', 'optimism'];
@@ -197,6 +197,83 @@ export const mockDashboardKPIs: DashboardKPIs = {
   active_customers: 89,
   active_customers_change: 15.2,
 };
+
+export const mockHolds: Hold[] = Array.from({ length: 12 }, (_, i) => {
+  const amount = Math.floor(Math.random() * 50000) + 1000;
+  const statuses: Hold['status'][] = ['active', 'active', 'captured', 'released', 'expired'];
+  const status = statuses[Math.floor(Math.random() * statuses.length)];
+  const capturedAmount = status === 'captured' ? amount : status === 'released' ? 0 : 0;
+  const releasedAmount = status === 'released' ? amount : 0;
+  return {
+    id: `hold_${String(i + 1).padStart(3, '0')}`,
+    amount,
+    captured_amount: capturedAmount,
+    released_amount: releasedAmount,
+    status,
+    customer_id: `cus_${String((i % 10) + 1).padStart(3, '0')}`,
+    from_address: addresses[i % addresses.length],
+    expires_at: new Date(Date.now() + (status === 'active' ? Math.floor(Math.random() * 7) * 86400000 : -86400000)).toISOString(),
+    created_at: randomDate(14),
+  };
+}).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+export const mockPlans: Plan[] = [
+  { id: 'plan_001', merchant_address: merchantAddress, name: 'Starter', amount: 2900, interval: 'month', interval_seconds: 2592000, trial_days: 14, grace_period: 259200, max_retries: 3, active: true, subscriber_count: 45, created_at: randomDate(90) },
+  { id: 'plan_002', merchant_address: merchantAddress, name: 'Professional', amount: 9900, interval: 'month', interval_seconds: 2592000, trial_days: 7, grace_period: 259200, max_retries: 3, active: true, subscriber_count: 28, created_at: randomDate(90) },
+  { id: 'plan_003', merchant_address: merchantAddress, name: 'Enterprise', amount: 29900, interval: 'month', interval_seconds: 2592000, trial_days: 30, grace_period: 432000, max_retries: 5, active: true, subscriber_count: 12, created_at: randomDate(60) },
+  { id: 'plan_004', merchant_address: merchantAddress, name: 'Annual Pro', amount: 99900, interval: 'year', interval_seconds: 31536000, trial_days: 14, grace_period: 604800, max_retries: 5, active: true, subscriber_count: 8, created_at: randomDate(30) },
+  { id: 'plan_005', merchant_address: merchantAddress, name: 'Legacy Basic', amount: 1900, interval: 'month', interval_seconds: 2592000, trial_days: 0, grace_period: 172800, max_retries: 2, active: false, subscriber_count: 3, created_at: randomDate(180) },
+];
+
+export const mockSubscriptions: Subscription[] = Array.from({ length: 15 }, (_, i) => {
+  const statuses: Subscription['status'][] = ['active', 'active', 'active', 'trialing', 'past_due', 'canceled'];
+  const status = statuses[Math.floor(Math.random() * statuses.length)];
+  const plan = mockPlans[i % mockPlans.length];
+  const periodStart = randomDate(30);
+  const periodEnd = new Date(new Date(periodStart).getTime() + (plan.interval === 'year' ? 31536000000 : 2592000000)).toISOString();
+  return {
+    id: `sub_${String(i + 1).padStart(3, '0')}`,
+    customer_id: `cus_${String((i % 10) + 1).padStart(3, '0')}`,
+    plan_name: plan.name,
+    amount: plan.amount,
+    interval: plan.interval,
+    status,
+    current_period_start: periodStart,
+    current_period_end: periodEnd,
+    next_billing_date: periodEnd,
+    retry_count: status === 'past_due' ? Math.floor(Math.random() * 3) + 1 : 0,
+    max_retries: plan.max_retries,
+    created_at: randomDate(90),
+  };
+}).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+export const mockConnectedAccounts: ConnectedAccount[] = Array.from({ length: 8 }, (_, i) => {
+  const statuses: ConnectedAccount['status'][] = ['active', 'active', 'active', 'onboarding', 'suspended'];
+  return {
+    id: `ca_${String(i + 1).padStart(3, '0')}`,
+    wallet_address: addresses[i % addresses.length],
+    settlement_wallet: addresses[(i + 1) % addresses.length],
+    label: ['Vendor A', 'Vendor B', 'Partner Co', 'Freelancer X', 'Agency Y', 'Studio Z', 'Contractor M', 'Service Co'][i],
+    status: statuses[Math.floor(Math.random() * statuses.length)],
+    total_received: Math.floor(Math.random() * 500000) + 5000,
+    split_count: Math.floor(Math.random() * 50) + 1,
+    created_at: randomDate(60),
+  };
+});
+
+export const mockPayouts: Payout[] = Array.from({ length: 10 }, (_, i) => {
+  const statuses: Payout['status'][] = ['completed', 'completed', 'completed', 'pending', 'processing', 'failed'];
+  const status = statuses[Math.floor(Math.random() * statuses.length)];
+  return {
+    id: `po_${String(i + 1).padStart(3, '0')}`,
+    recipient_address: addresses[i % addresses.length],
+    amount: Math.floor(Math.random() * 100000) + 5000,
+    status,
+    tx_hash: ['completed', 'processing'].includes(status) ? `0x${Math.random().toString(16).slice(2)}${Math.random().toString(16).slice(2)}` : null,
+    created_at: randomDate(14),
+    completed_at: status === 'completed' ? randomDate(7) : null,
+  };
+}).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
 export const mockVolumeChart = Array.from({ length: 30 }, (_, i) => {
   const d = new Date();

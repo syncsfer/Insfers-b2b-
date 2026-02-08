@@ -160,21 +160,6 @@ export default function ClaimRefundPage() {
           </div>
         )}
 
-        {/* Demo state switcher */}
-        <div className="mt-8 pt-4 border-t border-gray-100">
-          <p className="text-[10px] text-gray-400 text-center mb-2">Demo: Switch state</p>
-          <div className="flex flex-wrap gap-1 justify-center">
-            {(['not_connected', 'connected', 'claiming', 'claimed', 'expired', 'already_claimed'] as ClaimState[]).map(s => (
-              <button
-                key={s}
-                onClick={() => setState(s)}
-                className={`px-2 py-0.5 text-[10px] rounded ${state === s ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'}`}
-              >
-                {s.replace(/_/g, ' ')}
-              </button>
-            ))}
-          </div>
-        </div>
       </div>
     </div>
   );

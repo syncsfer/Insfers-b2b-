@@ -8,63 +8,8 @@ import { DataTable, type Column } from '@/components/ui/data-table';
 import { Modal } from '@/components/ui/modal';
 import { useToast } from '@/components/ui/toast';
 import { formatUSDC, formatRelativeTime } from '@/lib/utils';
-import type { SubscriptionStatus } from '@/types';
-
-interface Plan {
-  id: string;
-  name: string;
-  amount: number;
-  interval: 'week' | 'month' | 'year';
-  trial_days: number;
-}
-
-interface SubscriptionItem {
-  id: string;
-  customer_address: string;
-  customer_email: string | null;
-  plan: Plan;
-  status: SubscriptionStatus;
-  next_billing: string;
-  mrr: number;
-  retry_count: number;
-  max_retries: number;
-  created_at: string;
-}
-
-const plans: Plan[] = [
-  { id: 'plan_001', name: 'Starter', amount: 2900, interval: 'month', trial_days: 14 },
-  { id: 'plan_002', name: 'Pro', amount: 9900, interval: 'month', trial_days: 7 },
-  { id: 'plan_003', name: 'Enterprise', amount: 29900, interval: 'month', trial_days: 0 },
-  { id: 'plan_004', name: 'Annual Pro', amount: 99900, interval: 'year', trial_days: 14 },
-];
-
-const addrs = [
-  '0x1a2b3c4d5e6f7890abcdef1234567890abcdef12',
-  '0x9876543210fedcba9876543210fedcba98765432',
-  '0xabcdef1234567890abcdef1234567890abcdef12',
-  '0xdeadbeef12345678deadbeef12345678deadbeef',
-  '0xcafe1234babe5678cafe1234babe5678cafe1234',
-];
-
-const mockSubs: SubscriptionItem[] = Array.from({ length: 18 }, (_, i) => {
-  const plan = plans[Math.floor(Math.random() * plans.length)];
-  const statuses: SubscriptionStatus[] = ['active', 'active', 'active', 'past_due', 'canceled', 'trialing'];
-  const status = statuses[Math.floor(Math.random() * statuses.length)];
-  const d = new Date();
-  d.setDate(d.getDate() + Math.floor(Math.random() * 30));
-  return {
-    id: `sub_${String(i + 1).padStart(3, '0')}`,
-    customer_address: addrs[i % addrs.length],
-    customer_email: Math.random() > 0.3 ? `user${i + 1}@example.com` : null,
-    plan,
-    status,
-    next_billing: d.toISOString(),
-    mrr: plan.interval === 'year' ? Math.floor(plan.amount / 12) : plan.amount,
-    retry_count: status === 'past_due' ? Math.floor(Math.random() * 3) + 1 : 0,
-    max_retries: 3,
-    created_at: new Date(Date.now() - Math.random() * 90 * 86400000).toISOString(),
-  };
-});
+import { mockSubscriptions, mockPlans, mockCustomers } from '@/lib/mock-data';
+import type { SubscriptionStatus, Subscription } from '@/types';
 
 const subTabs: { label: string; value: SubscriptionStatus | 'all' }[] = [
   { label: 'All', value: 'all' as SubscriptionStatus | 'all' },
@@ -86,40 +31,44 @@ export default function SubscriptionsPage() {
   const [planTrial, setPlanTrial] = useState('0');
 
   const filtered = useMemo(() => {
-    let data = mockSubs;
+    let data = mockSubscriptions;
     if (activeTab !== 'all') data = data.filter(s => s.status === activeTab);
     if (search) {
       const q = search.toLowerCase();
-      data = data.filter(s => s.id.includes(q) || s.customer_email?.includes(q) || s.customer_address.includes(q));
+      data = data.filter(s => s.id.includes(q) || s.plan_name.toLowerCase().includes(q) || s.customer_id.includes(q));
     }
     return data;
   }, [activeTab, search]);
 
   const tabCounts = useMemo(() => {
-    const c: Record<string, number> = { all: mockSubs.length };
-    for (const s of mockSubs) c[s.status] = (c[s.status] || 0) + 1;
+    const c: Record<string, number> = { all: mockSubscriptions.length };
+    for (const s of mockSubscriptions) c[s.status] = (c[s.status] || 0) + 1;
     return c;
   }, []);
 
-  const totalMRR = mockSubs.filter(s => s.status === 'active' || s.status === 'trialing').reduce((sum, s) => sum + s.mrr, 0);
+  const getMRR = (s: Subscription) => s.interval === 'year' ? Math.floor(s.amount / 12) : s.amount;
+  const totalMRR = mockSubscriptions.filter(s => s.status === 'active' || s.status === 'trialing').reduce((sum, s) => sum + getMRR(s), 0);
 
-  const columns: Column<SubscriptionItem>[] = [
+  const columns: Column<Subscription>[] = [
     { key: 'status', header: 'Status', width: '100px', render: (s) => <StatusPill status={s.status} size="sm" /> },
     {
       key: 'customer', header: 'Customer', width: '200px',
-      render: (s) => (
-        <div>
-          <div className="text-sm text-gray-900">{s.customer_email || 'Anonymous'}</div>
-          <div className="text-[11px] font-mono text-gray-400">{s.customer_address.slice(0, 10)}...</div>
-        </div>
-      ),
+      render: (s) => {
+        const cust = mockCustomers.find(c => c.id === s.customer_id);
+        return (
+          <div>
+            <div className="text-sm text-gray-900">{cust?.email || 'Anonymous'}</div>
+            <div className="text-[11px] font-mono text-gray-400">{cust?.wallet_address.slice(0, 10) || s.customer_id}...</div>
+          </div>
+        );
+      },
     },
     {
       key: 'plan', header: 'Plan', width: '160px',
       render: (s) => (
         <div>
-          <span className="text-sm font-medium text-gray-900">{s.plan.name}</span>
-          <span className="text-xs text-gray-500 ml-1">({formatUSDC(s.plan.amount)}/{s.plan.interval})</span>
+          <span className="text-sm font-medium text-gray-900">{s.plan_name}</span>
+          <span className="text-xs text-gray-500 ml-1">({formatUSDC(s.amount)}/{s.interval})</span>
         </div>
       ),
     },
@@ -127,11 +76,11 @@ export default function SubscriptionsPage() {
       key: 'next_billing', header: 'Next Billing', width: '130px',
       render: (s) => {
         if (s.status === 'canceled') return <span className="text-gray-300">-</span>;
-        const daysUntil = Math.ceil((new Date(s.next_billing).getTime() - Date.now()) / 86400000);
+        const daysUntil = Math.ceil((new Date(s.next_billing_date).getTime() - Date.now()) / 86400000);
         return <span className={`text-sm ${daysUntil <= 3 ? 'text-amber-600 font-medium' : 'text-gray-600'}`}>{daysUntil > 0 ? `${daysUntil} days` : 'Today'}</span>;
       },
     },
-    { key: 'mrr', header: 'MRR', width: '90px', align: 'right', render: (s) => <span className="text-sm font-semibold text-gray-900">{formatUSDC(s.mrr)}</span> },
+    { key: 'mrr', header: 'MRR', width: '90px', align: 'right', render: (s) => <span className="text-sm font-semibold text-gray-900">{formatUSDC(getMRR(s))}</span> },
     {
       key: 'retry', header: 'Retries', width: '80px', align: 'center',
       render: (s) => s.status === 'past_due' ? (
@@ -172,16 +121,19 @@ export default function SubscriptionsPage() {
 
       {showPlans ? (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {plans.map(p => (
+          {mockPlans.map(p => (
             <div key={p.id} className="bg-white border border-gray-200 rounded-xl p-5">
-              <h3 className="text-base font-semibold text-gray-900">{p.name}</h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-base font-semibold text-gray-900">{p.name}</h3>
+                {!p.active && <span className="text-[10px] font-medium text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">Inactive</span>}
+              </div>
               <div className="mt-2">
                 <span className="text-2xl font-bold text-gray-900">{formatUSDC(p.amount)}</span>
                 <span className="text-sm text-gray-500">/{p.interval}</span>
               </div>
               {p.trial_days > 0 && <p className="text-xs text-blue-600 mt-1">{p.trial_days}-day free trial</p>}
               <div className="mt-3 text-xs text-gray-500">
-                {mockSubs.filter(s => s.plan.id === p.id && (s.status === 'active' || s.status === 'trialing')).length} active subscribers
+                {p.subscriber_count} active subscribers
               </div>
             </div>
           ))}
