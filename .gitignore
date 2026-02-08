@@ -15,5 +15,9 @@ out/
 *.tsbuildinfo
 next-env.d.ts
 
+# foundry
+contracts/cache/
+contracts/out/
+
 # misc
 .DS_Store
