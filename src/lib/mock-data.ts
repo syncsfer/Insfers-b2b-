@@ -95,7 +95,7 @@ export const mockPaymentLinks: PaymentLink[] = Array.from({ length: 8 }, (_, i) 
   name: ['Pro Plan', 'Starter Plan', 'Donation', 'Event Ticket', 'Consultation Fee', 'Workshop', 'Merch', 'Custom'][i],
   amount: [9900, 2900, null, 5000, 15000, 7500, 3500, null][i],
   currency: 'USDC',
-  url: `https://pay.chainpayments.com/link/pl_${i + 1}`,
+  url: `/l/pl_${String(i + 1).padStart(3, '0')}`,
   active: Math.random() > 0.2,
   chains: ['base', 'ethereum'] as Chain[],
   payment_count: Math.floor(Math.random() * 100),
