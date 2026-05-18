@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react';
 import { Search, Filter, Plus, MoreHorizontal, Copy, ExternalLink } from 'lucide-react';
 import { StatusPill } from '@/components/ui/status-pill';
+import { getStatusSummary } from '@/components/ui/status-explainer';
 import { WalletChip } from '@/components/ui/wallet-chip';
 import { DataTable, type Column } from '@/components/ui/data-table';
 import { Modal } from '@/components/ui/modal';
@@ -51,7 +52,12 @@ export default function RefundsPage() {
   const selectedPaymentObj = succeededPayments.find(p => p.id === selectedPayment);
 
   const columns: Column<Refund>[] = [
-    { key: 'status', header: 'Status', width: '120px', render: (r) => <StatusPill status={r.status} size="sm" /> },
+    { key: 'status', header: 'Status', width: '140px', render: (r) => (
+      <div>
+        <StatusPill status={r.status} size="sm" />
+        <div className="text-[10px] text-gray-400 mt-0.5 leading-tight">{getStatusSummary('refund', r.status)}</div>
+      </div>
+    ) },
     { key: 'amount', header: 'Amount', width: '90px', align: 'right', render: (r) => <span className="font-semibold text-gray-900">{formatUSDC(r.amount)}</span> },
     { key: 'payment', header: 'Original Payment', width: '130px', render: (r) => <a href={`/dashboard/payments/${r.payment_intent_id}`} className="text-sm text-blue-600 font-mono hover:text-blue-700">{truncateAddress(r.payment_intent_id)}</a> },
     { key: 'method', header: 'Method', width: '110px', render: (r) => <span className="text-sm capitalize text-gray-600">{r.method === 'claimable' ? 'Claimable' : r.method === 'direct' ? 'Direct' : 'Escrow'}</span> },

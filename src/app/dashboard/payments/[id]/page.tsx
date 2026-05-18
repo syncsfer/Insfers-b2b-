@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Copy, ExternalLink, RotateCcw, Check } from 'lucide-react';
 import { StatusPill } from '@/components/ui/status-pill';
+import { StatusExplainer } from '@/components/ui/status-explainer';
 import { WalletChip } from '@/components/ui/wallet-chip';
 import { ChainBadge } from '@/components/ui/chain-badge';
 import { Timeline } from '@/components/ui/timeline';
@@ -77,6 +78,21 @@ export default function PaymentDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Status explainer */}
+      <StatusExplainer
+        context="payment"
+        status={payment.status}
+        timestamp={payment.status === 'succeeded' ? payment.confirmed_at ?? undefined : payment.created_at}
+        className="mb-6"
+        onAction={
+          payment.status === 'succeeded'
+            ? () => router.push(`/dashboard/refunds?payment=${payment.id}`)
+            : payment.status === 'failed' && payment.tx_hash
+              ? () => window.open(getExplorerUrl(payment.chain, payment.tx_hash!), '_blank')
+              : undefined
+        }
+      />
 
       {/* Two column layout */}
       <div className="flex gap-6">

@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react';
 import { Search, Timer, DollarSign, ArrowRight } from 'lucide-react';
 import { StatusPill } from '@/components/ui/status-pill';
+import { getStatusSummary } from '@/components/ui/status-explainer';
 import { WalletChip } from '@/components/ui/wallet-chip';
 import { DataTable, type Column } from '@/components/ui/data-table';
 import { Modal } from '@/components/ui/modal';
@@ -50,7 +51,12 @@ export default function HoldsPage() {
   };
 
   const columns: Column<Hold>[] = [
-    { key: 'status', header: 'Status', width: '110px', render: (h) => <StatusPill status={h.status} size="sm" /> },
+    { key: 'status', header: 'Status', width: '140px', render: (h) => (
+      <div>
+        <StatusPill status={h.status} size="sm" />
+        <div className="text-[10px] text-gray-400 mt-0.5 leading-tight">{getStatusSummary('hold', h.status)}</div>
+      </div>
+    ) },
     { key: 'amount', header: 'Amount', width: '100px', align: 'right', render: (h) => <span className="font-semibold text-gray-900">{formatUSDC(h.amount)}</span> },
     { key: 'captured', header: 'Captured', width: '100px', align: 'right', render: (h) => <span className="text-sm text-gray-600">{formatUSDC(h.captured_amount)}</span> },
     { key: 'remaining', header: 'Remaining', width: '100px', align: 'right', render: (h) => <span className="text-sm font-medium text-gray-900">{formatUSDC(getRemaining(h))}</span> },

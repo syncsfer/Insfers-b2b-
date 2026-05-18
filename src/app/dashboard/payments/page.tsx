@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Search, Filter, MoreHorizontal, Copy, ExternalLink, Download, Link as LinkIcon } from 'lucide-react';
 import { StatusPill } from '@/components/ui/status-pill';
+import { getStatusSummary } from '@/components/ui/status-explainer';
 import { WalletChip } from '@/components/ui/wallet-chip';
 import { ChainBadge } from '@/components/ui/chain-badge';
 import { DataTable, type Column } from '@/components/ui/data-table';
@@ -56,8 +57,13 @@ export default function PaymentsPage() {
     {
       key: 'status',
       header: 'Status',
-      width: '110px',
-      render: (p) => <StatusPill status={p.status} size="sm" />,
+      width: '140px',
+      render: (p) => (
+        <div>
+          <StatusPill status={p.status} size="sm" />
+          <div className="text-[10px] text-gray-400 mt-0.5 leading-tight">{getStatusSummary('payment', p.status)}</div>
+        </div>
+      ),
     },
     {
       key: 'amount',

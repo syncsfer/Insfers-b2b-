@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { Plus, Send, Eye, MoreHorizontal, Copy, ExternalLink, CheckCircle2 } from 'lucide-react';
 import { StatusPill } from '@/components/ui/status-pill';
+import { getStatusSummary } from '@/components/ui/status-explainer';
 import { DataTable, type Column } from '@/components/ui/data-table';
 import { Modal } from '@/components/ui/modal';
 import { useToast } from '@/components/ui/toast';
@@ -67,7 +68,12 @@ export default function InvoicesPage() {
         </div>
       ),
     },
-    { key: 'status', header: 'Status', width: '100px', render: (inv) => <StatusPill status={inv.status} size="sm" /> },
+    { key: 'status', header: 'Status', width: '130px', render: (inv) => (
+      <div>
+        <StatusPill status={inv.status} size="sm" />
+        <div className="text-[10px] text-gray-400 mt-0.5 leading-tight">{getStatusSummary('invoice', inv.status)}</div>
+      </div>
+    ) },
     { key: 'amount', header: 'Amount', width: '100px', align: 'right', render: (inv) => <span className="font-semibold text-gray-900">{formatUSDC(inv.amount)}</span> },
     {
       key: 'due', header: 'Due Date', width: '120px',
