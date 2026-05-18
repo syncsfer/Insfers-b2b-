@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Wallet, AlertTriangle, Loader2, Check, X, ExternalLink, Copy, ChevronDown } from 'lucide-react';
+import Link from 'next/link';
+import { Wallet, AlertTriangle, Loader2, Check, X, ExternalLink, Copy, ChevronDown, ShieldCheck } from 'lucide-react';
 import { ChainBadge } from '@/components/ui/chain-badge';
 import { formatUSDC, truncateAddress, getExplorerUrl } from '@/lib/utils';
 import type { CheckoutState, Chain } from '@/types';
@@ -336,7 +337,9 @@ export default function CheckoutPage() {
 
             {/* Footer */}
             <div className="mt-6 text-center">
-              <span className="text-[10px] text-gray-300">Powered by Chain Payments</span>
+              <Link href="/security" className="inline-flex items-center gap-1 text-[10px] text-gray-400 hover:text-blue-500 transition-colors">
+                <ShieldCheck size={10} /> Secured by Chain Payments
+              </Link>
             </div>
           </div>
         </div>

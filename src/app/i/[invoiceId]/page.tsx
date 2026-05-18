@@ -2,7 +2,7 @@
 
 import { useState, use } from 'react';
 import Link from 'next/link';
-import { FileText, Download, CheckCircle2, Clock, AlertCircle, Zap, ExternalLink } from 'lucide-react';
+import { FileText, Download, CheckCircle2, Clock, AlertCircle, Zap, ExternalLink, ShieldCheck } from 'lucide-react';
 import { StatusPill } from '@/components/ui/status-pill';
 import { ChainBadge } from '@/components/ui/chain-badge';
 import { useToast } from '@/components/ui/toast';
@@ -211,8 +211,10 @@ export default function PublicInvoicePage({ params }: { params: Promise<{ invoic
           </div>
         )}
 
-        <p className="text-center text-[11px] text-gray-400 mt-6">
-          Powered by <span className="font-medium">Chain Payments</span>
+        <p className="text-center mt-6">
+          <Link href="/security" className="inline-flex items-center gap-1 text-[11px] text-gray-400 hover:text-blue-500 transition-colors">
+            <ShieldCheck size={11} /> Secured by <span className="font-medium">Chain Payments</span>
+          </Link>
         </p>
       </div>
     </div>

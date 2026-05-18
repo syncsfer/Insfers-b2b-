@@ -141,8 +141,10 @@ export default function PublicPaymentLinkPage({ params }: { params: Promise<{ li
             </>
           )}
 
-          <p className="text-center text-[11px] text-gray-400 mt-5">
-            Powered by <span className="font-medium">Chain Payments</span>
+          <p className="text-center mt-5">
+            <Link href="/security" className="inline-flex items-center gap-1 text-[11px] text-gray-400 hover:text-blue-500 transition-colors">
+              <ShieldCheck size={11} /> Secured by <span className="font-medium">Chain Payments</span>
+            </Link>
           </p>
         </div>
       </div>
