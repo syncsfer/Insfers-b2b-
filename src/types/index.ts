@@ -203,6 +203,23 @@ export interface Payout {
   completed_at: string | null;
 }
 
+export type ActionCategory = 'failed_transaction' | 'kyc_review' | 'flagged_activity' | 'dispute' | 'payout_issue' | 'overdue_invoice' | 'expiring_hold' | 'webhook_failure' | 'subscription_dunning' | 'account_review';
+export type ActionPriority = 'critical' | 'high' | 'medium' | 'low';
+
+export interface ActionItem {
+  id: string;
+  category: ActionCategory;
+  priority: ActionPriority;
+  title: string;
+  description: string;
+  entity_id: string;
+  entity_type: 'payment' | 'refund' | 'customer' | 'invoice' | 'hold' | 'payout' | 'subscription' | 'webhook' | 'account';
+  href: string;
+  amount?: number;
+  created_at: string;
+  resolved: boolean;
+}
+
 export interface DashboardKPIs {
   total_volume: number;
   total_volume_change: number;

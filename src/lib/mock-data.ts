@@ -2,6 +2,7 @@ import type {
   PaymentIntent, Refund, Customer, PaymentLink, Invoice,
   WebhookEndpoint, ApiKey, WebhookLog, TimelineEvent, DashboardKPIs,
   Chain, Hold, Subscription, Plan, ConnectedAccount, Payout,
+  ActionItem,
 } from '@/types';
 
 const chains: Chain[] = ['base', 'ethereum', 'polygon', 'arbitrum', 'optimism'];
@@ -284,3 +285,194 @@ export const mockVolumeChart = Array.from({ length: 30 }, (_, i) => {
     count: Math.floor(Math.random() * 20) + 5,
   };
 });
+
+function buildActionItems(): ActionItem[] {
+  const items: ActionItem[] = [];
+  let idx = 0;
+
+  for (const p of mockPayments.filter(p => p.status === 'failed')) {
+    items.push({
+      id: `act_${++idx}`,
+      category: 'failed_transaction',
+      priority: 'high',
+      title: `Failed payment ${p.id}`,
+      description: `Transaction of ${(p.amount / 100).toFixed(2)} USDC on ${p.chain} reverted. Customer may need assistance retrying.`,
+      entity_id: p.id,
+      entity_type: 'payment',
+      href: `/dashboard/payments/${p.id}`,
+      amount: p.amount,
+      created_at: p.created_at,
+      resolved: false,
+    });
+  }
+
+  for (const c of mockCustomers.filter(c => c.risk_level === 'high')) {
+    items.push({
+      id: `act_${++idx}`,
+      category: 'flagged_activity',
+      priority: 'critical',
+      title: `High-risk wallet: ${c.wallet_address.slice(0, 10)}...`,
+      description: `Customer ${c.id} flagged as high risk with ${c.payment_count} payments and $${(c.lifetime_value / 100).toFixed(2)} lifetime value. Review activity.`,
+      entity_id: c.id,
+      entity_type: 'customer',
+      href: `/dashboard/customers/${c.id}`,
+      amount: c.lifetime_value,
+      created_at: c.last_payment_at,
+      resolved: false,
+    });
+  }
+
+  for (const c of mockCustomers.filter(c => !c.email && c.payment_count > 5)) {
+    items.push({
+      id: `act_${++idx}`,
+      category: 'kyc_review',
+      priority: 'medium',
+      title: `Unverified high-volume wallet`,
+      description: `Customer ${c.id} has ${c.payment_count} payments but no email on file. Consider requesting identity verification.`,
+      entity_id: c.id,
+      entity_type: 'customer',
+      href: `/dashboard/customers/${c.id}`,
+      created_at: c.last_payment_at,
+      resolved: false,
+    });
+  }
+
+  for (const inv of mockInvoices.filter(inv => inv.status === 'overdue')) {
+    items.push({
+      id: `act_${++idx}`,
+      category: 'overdue_invoice',
+      priority: 'high',
+      title: `Invoice ${inv.id} overdue`,
+      description: `${inv.customer_email} owes ${(inv.amount / 100).toFixed(2)} USDC. Due date has passed — send a reminder or void.`,
+      entity_id: inv.id,
+      entity_type: 'invoice',
+      href: `/dashboard/invoices`,
+      amount: inv.amount,
+      created_at: inv.due_date,
+      resolved: false,
+    });
+  }
+
+  for (const r of mockRefunds.filter(r => r.status === 'failed')) {
+    items.push({
+      id: `act_${++idx}`,
+      category: 'dispute',
+      priority: 'critical',
+      title: `Refund ${r.id} failed`,
+      description: `Refund of ${(r.amount / 100).toFixed(2)} USDC for payment ${r.payment_intent_id} could not be processed. Customer is waiting.`,
+      entity_id: r.id,
+      entity_type: 'refund',
+      href: `/dashboard/refunds`,
+      amount: r.amount,
+      created_at: r.created_at,
+      resolved: false,
+    });
+  }
+
+  for (const r of mockRefunds.filter(r => r.status === 'awaiting_claim' && r.claim_expires_at)) {
+    const hoursLeft = (new Date(r.claim_expires_at!).getTime() - Date.now()) / 3600000;
+    if (hoursLeft < 12 && hoursLeft > 0) {
+      items.push({
+        id: `act_${++idx}`,
+        category: 'dispute',
+        priority: 'high',
+        title: `Refund claim expiring soon`,
+        description: `Refund ${r.id} claim link expires in ${Math.floor(hoursLeft)}h. Notify the customer before funds return to you.`,
+        entity_id: r.id,
+        entity_type: 'refund',
+        href: `/dashboard/refunds`,
+        amount: r.amount,
+        created_at: r.created_at,
+        resolved: false,
+      });
+    }
+  }
+
+  for (const po of mockPayouts.filter(po => po.status === 'failed')) {
+    items.push({
+      id: `act_${++idx}`,
+      category: 'payout_issue',
+      priority: 'critical',
+      title: `Payout ${po.id} failed`,
+      description: `Payout of ${(po.amount / 100).toFixed(2)} USDC to ${po.recipient_address.slice(0, 10)}... did not complete. Retry or investigate.`,
+      entity_id: po.id,
+      entity_type: 'payout',
+      href: `/dashboard`,
+      amount: po.amount,
+      created_at: po.created_at,
+      resolved: false,
+    });
+  }
+
+  for (const h of mockHolds.filter(h => h.status === 'active')) {
+    const hoursLeft = (new Date(h.expires_at).getTime() - Date.now()) / 3600000;
+    if (hoursLeft < 24 && hoursLeft > 0) {
+      items.push({
+        id: `act_${++idx}`,
+        category: 'expiring_hold',
+        priority: 'high',
+        title: `Hold ${h.id} expiring soon`,
+        description: `Hold of ${(h.amount / 100).toFixed(2)} USDC expires in ${Math.floor(hoursLeft)}h. Capture or release before auto-expiry.`,
+        entity_id: h.id,
+        entity_type: 'hold',
+        href: `/dashboard/holds`,
+        amount: h.amount,
+        created_at: h.created_at,
+        resolved: false,
+      });
+    }
+  }
+
+  for (const sub of mockSubscriptions.filter(s => s.status === 'past_due')) {
+    items.push({
+      id: `act_${++idx}`,
+      category: 'subscription_dunning',
+      priority: 'medium',
+      title: `Subscription ${sub.id} past due`,
+      description: `${sub.plan_name} plan for customer ${sub.customer_id} — retry ${sub.retry_count}/${sub.max_retries}. May cancel if not resolved.`,
+      entity_id: sub.id,
+      entity_type: 'subscription',
+      href: `/dashboard/subscriptions`,
+      amount: sub.amount,
+      created_at: sub.current_period_end,
+      resolved: false,
+    });
+  }
+
+  for (const wl of mockWebhookLogs.filter(w => !w.success).slice(0, 3)) {
+    items.push({
+      id: `act_${++idx}`,
+      category: 'webhook_failure',
+      priority: 'medium',
+      title: `Webhook delivery failed (${wl.event_type})`,
+      description: `Endpoint ${wl.endpoint_id} returned HTTP ${wl.status_code} for ${wl.event_type}. Events may not be processed by your backend.`,
+      entity_id: wl.id,
+      entity_type: 'webhook',
+      href: `/dashboard/developer`,
+      created_at: wl.created_at,
+      resolved: false,
+    });
+  }
+
+  for (const ca of mockConnectedAccounts.filter(a => a.status === 'onboarding')) {
+    items.push({
+      id: `act_${++idx}`,
+      category: 'account_review',
+      priority: 'low',
+      title: `${ca.label} onboarding incomplete`,
+      description: `Connected account ${ca.id} has not completed onboarding. Review and assist or remove.`,
+      entity_id: ca.id,
+      entity_type: 'account',
+      href: `/dashboard/connect`,
+      created_at: ca.created_at,
+      resolved: false,
+    });
+  }
+
+  const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
+  items.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority] || new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+  return items;
+}
+
+export const mockActionItems: ActionItem[] = buildActionItems();

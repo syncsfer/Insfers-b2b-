@@ -6,11 +6,13 @@ import {
   LayoutDashboard, CreditCard, RotateCcw, Users, LinkIcon,
   FileText, BarChart3, Code2, Settings, Zap, TestTube,
   ShieldCheck, RefreshCw, GitBranch, ArrowLeftRight, HelpCircle,
+  AlertCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const navItems = [
+const navItems: { label: string; href: string; icon: React.ElementType; badge?: boolean }[] = [
   { label: 'Home', href: '/dashboard', icon: LayoutDashboard },
+  { label: 'Action Center', href: '/dashboard/actions', icon: AlertCircle, badge: true },
   { label: 'Payments', href: '/dashboard/payments', icon: CreditCard },
   { label: 'Refunds', href: '/dashboard/refunds', icon: RotateCcw },
   { label: 'Holds', href: '/dashboard/holds', icon: ShieldCheck },
@@ -64,11 +66,18 @@ export function Sidebar() {
                 'flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors',
                 isActive
                   ? 'bg-blue-50 text-blue-700'
-                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100',
+                  : item.badge
+                    ? 'text-orange-700 hover:text-orange-800 hover:bg-orange-50'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100',
               )}
             >
               <item.icon size={18} strokeWidth={isActive ? 2 : 1.5} />
               {item.label}
+              {item.badge && (
+                <span className="ml-auto w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+                  !
+                </span>
+              )}
             </Link>
           );
         })}
