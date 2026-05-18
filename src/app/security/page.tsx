@@ -66,6 +66,7 @@ export default function SecurityPage() {
             <span className="text-[15px] font-bold text-gray-900">Chain Payments</span>
           </Link>
           <div className="flex items-center gap-6">
+            <Link href="/how-it-works" className="text-sm text-gray-600 hover:text-gray-900 font-medium">How It Works</Link>
             <a href="#security" className="text-sm text-gray-600 hover:text-gray-900 font-medium">Security</a>
             <a href="#compliance" className="text-sm text-gray-600 hover:text-gray-900 font-medium">Compliance</a>
             <a href="#networks" className="text-sm text-gray-600 hover:text-gray-900 font-medium">Networks</a>

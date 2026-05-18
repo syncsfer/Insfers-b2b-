@@ -5,7 +5,7 @@ import Link from 'next/link';
 import {
   LayoutDashboard, CreditCard, RotateCcw, Users, LinkIcon,
   FileText, BarChart3, Code2, Settings, Zap, TestTube,
-  ShieldCheck, RefreshCw, GitBranch, ArrowLeftRight,
+  ShieldCheck, RefreshCw, GitBranch, ArrowLeftRight, HelpCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -76,6 +76,9 @@ export function Sidebar() {
 
       {/* Footer */}
       <div className="px-3 py-4 border-t border-border space-y-2">
+        <Link href="/how-it-works" className="flex items-center gap-2 px-3 py-1.5 text-[11px] font-medium text-gray-500 hover:text-blue-600 rounded-md hover:bg-blue-50 transition-colors">
+          <HelpCircle size={13} /> How It Works
+        </Link>
         <Link href="/security" className="flex items-center gap-2 px-3 py-1.5 text-[11px] font-medium text-gray-500 hover:text-blue-600 rounded-md hover:bg-blue-50 transition-colors">
           <ShieldCheck size={13} /> Trust & Security
         </Link>
