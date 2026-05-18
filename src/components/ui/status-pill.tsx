@@ -10,7 +10,8 @@ type StatusVariant =
   | 'draft' | 'sent' | 'paid' | 'void' | 'overdue'
   | 'onboarding' | 'suspended'
   | 'created' | 'completed'
-  | 'review' | 'low' | 'medium' | 'high';
+  | 'review' | 'low' | 'medium' | 'high'
+  | 'paused' | 'disabled';
 
 const variantStyles: Record<string, { bg: string; text: string; border: string }> = {
   succeeded:        { bg: 'bg-success-bg',  text: 'text-success-text',  border: 'border-success-border' },
@@ -39,6 +40,8 @@ const variantStyles: Record<string, { bg: string; text: string; border: string }
   canceled:         { bg: 'bg-neutral-bg',  text: 'text-[#6b7280]',     border: 'border-neutral-border' },
   void:             { bg: 'bg-neutral-bg',  text: 'text-[#6b7280]',     border: 'border-neutral-border' },
   awaiting_claim:   { bg: 'bg-claim-bg',    text: 'text-claim-text',    border: 'border-claim-border' },
+  paused:           { bg: 'bg-warning-bg',  text: 'text-warning-text',  border: 'border-warning-border' },
+  disabled:         { bg: 'bg-neutral-bg',  text: 'text-[#6b7280]',     border: 'border-neutral-border' },
 };
 
 const labels: Record<string, string> = {
@@ -68,6 +71,8 @@ const labels: Record<string, string> = {
   low: 'Low',
   medium: 'Medium',
   high: 'High',
+  paused: 'Paused',
+  disabled: 'Disabled',
 };
 
 interface StatusPillProps {

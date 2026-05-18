@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Copy, ExternalLink, RotateCcw, Check } from 'lucide-react';
+import { ArrowLeft, Copy, ExternalLink, RotateCcw, Check, Bot, Wallet } from 'lucide-react';
 import { StatusPill } from '@/components/ui/status-pill';
 import { StatusExplainer } from '@/components/ui/status-explainer';
 import { WalletChip } from '@/components/ui/wallet-chip';
@@ -10,7 +10,7 @@ import { ChainBadge } from '@/components/ui/chain-badge';
 import { Timeline } from '@/components/ui/timeline';
 import { useToast } from '@/components/ui/toast';
 import { formatUSDC, formatDate, getExplorerUrl, truncateAddress } from '@/lib/utils';
-import { mockPayments, mockTimeline } from '@/lib/mock-data';
+import { mockPayments, mockTimeline, mockAgents } from '@/lib/mock-data';
 
 export default function PaymentDetailPage() {
   const params = useParams();
@@ -181,6 +181,31 @@ export default function PaymentDetailPage() {
                     </div>
                   </div>
                 )}
+
+                <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                  <span className="text-sm text-gray-500">Source</span>
+                  <div className="flex items-center gap-2">
+                    {payment.initiated_by === 'agent' ? (
+                      <>
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200">
+                          <Bot size={11} /> Agent
+                        </span>
+                        {payment.agent_id && (
+                          <a
+                            href="/dashboard/agents"
+                            className="text-xs text-purple-600 hover:text-purple-800 font-medium"
+                          >
+                            {mockAgents.find(a => a.id === payment.agent_id)?.name || payment.agent_id}
+                          </a>
+                        )}
+                      </>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-50 text-gray-600 border border-gray-200">
+                        <Wallet size={11} /> Wallet
+                      </span>
+                    )}
+                  </div>
+                </div>
 
                 <div className="flex items-center justify-between py-2 border-b border-gray-100">
                   <span className="text-sm text-gray-500">Confirmations</span>

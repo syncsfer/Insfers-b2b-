@@ -2,7 +2,7 @@ import type {
   PaymentIntent, Refund, Customer, PaymentLink, Invoice,
   WebhookEndpoint, ApiKey, WebhookLog, TimelineEvent, DashboardKPIs,
   Chain, Hold, Subscription, Plan, ConnectedAccount, Payout,
-  ActionItem,
+  ActionItem, AIAgent, AgentAction,
 } from '@/types';
 
 const chains: Chain[] = ['base', 'ethereum', 'polygon', 'arbitrum', 'optimism'];
@@ -31,6 +31,7 @@ export const mockPayments: PaymentIntent[] = Array.from({ length: 50 }, (_, i) =
   const status = statuses[Math.floor(Math.random() * statuses.length)];
   const chain = chains[Math.floor(Math.random() * chains.length)];
   const created = randomDate(30);
+  const isAgent = Math.random() > 0.75;
 
   return {
     id: `pi_${String(i + 1).padStart(3, '0')}${Math.random().toString(36).slice(2, 10)}`,
@@ -51,6 +52,8 @@ export const mockPayments: PaymentIntent[] = Array.from({ length: 50 }, (_, i) =
     confirmed_at: status === 'succeeded' ? new Date(new Date(created).getTime() + 3000).toISOString() : null,
     description: ['Monthly subscription', 'One-time purchase', 'Invoice payment', 'Service fee', null][Math.floor(Math.random() * 5)],
     receipt_url: status === 'succeeded' ? `https://pay.chainpayments.com/receipt/r_${i}` : null,
+    initiated_by: isAgent ? 'agent' as 'agent' : 'human' as 'human',
+    agent_id: isAgent ? ['agent_001', 'agent_002', 'agent_003'][Math.floor(Math.random() * 3)] : null,
   };
 }).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
@@ -108,6 +111,8 @@ export const mockInvoices: Invoice[] = Array.from({ length: 12 }, (_, i) => {
   const statuses: Invoice['status'][] = ['paid', 'sent', 'draft', 'overdue', 'void'];
   const status = statuses[Math.floor(Math.random() * statuses.length)];
   const amount = Math.floor(Math.random() * 100000) + 1000;
+  const createdByAgent = Math.random() > 0.7;
+  const paidByAgent = status === 'paid' && Math.random() > 0.6;
   return {
     id: `inv_${String(i + 1).padStart(3, '0')}`,
     customer_id: `cus_${String((i % 10) + 1).padStart(3, '0')}`,
@@ -122,6 +127,10 @@ export const mockInvoices: Invoice[] = Array.from({ length: 12 }, (_, i) => {
     ],
     memo: Math.random() > 0.5 ? 'Thank you for your business' : null,
     created_at: randomDate(30),
+    created_by: (createdByAgent ? 'agent' : 'human') as 'agent' | 'human',
+    agent_id: createdByAgent ? 'agent_001' : null,
+    paid_by: (status === 'paid' ? (paidByAgent ? 'agent' : 'human') : null) as 'agent' | 'human' | null,
+    paid_by_agent_id: paidByAgent ? ['agent_002', 'agent_003'][Math.floor(Math.random() * 2)] : null,
   };
 }).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
@@ -275,6 +284,105 @@ export const mockPayouts: Payout[] = Array.from({ length: 10 }, (_, i) => {
     completed_at: status === 'completed' ? randomDate(7) : null,
   };
 }).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+// AI Agents
+
+const agentWallets = [
+  '0xA1B0T000000000000000000000000000000000a1',
+  '0xA1B0T000000000000000000000000000000000a2',
+  '0xA1B0T000000000000000000000000000000000a3',
+  '0xA1B0T000000000000000000000000000000000a4',
+];
+
+export const mockAgents: AIAgent[] = [
+  {
+    id: 'agent_001',
+    name: 'Invoice Autopilot',
+    description: 'Automatically creates and sends invoices for recurring services, follows up on overdue payments, and generates collection reports.',
+    status: 'active',
+    wallet_address: agentWallets[0],
+    wallet_balance: 245000,
+    chain: 'base',
+    capabilities: ['create_invoice', 'collect_payment', 'generate_report', 'monitor_activity'],
+    spending_limit_daily: 500000,
+    spending_limit_per_tx: 100000,
+    spent_today: 87500,
+    actions_today: 12,
+    total_actions: 342,
+    total_volume: 4250000,
+    created_at: randomDate(60),
+    last_active_at: randomDate(0),
+  },
+  {
+    id: 'agent_002',
+    name: 'Payment Bot',
+    description: 'Executes scheduled outbound payments to vendors, handles subscription renewals, and processes approved refunds automatically.',
+    status: 'active',
+    wallet_address: agentWallets[1],
+    wallet_balance: 1820000,
+    chain: 'base',
+    capabilities: ['send_payment', 'issue_refund', 'manage_subscriptions'],
+    spending_limit_daily: 2000000,
+    spending_limit_per_tx: 500000,
+    spent_today: 320000,
+    actions_today: 5,
+    total_actions: 189,
+    total_volume: 8920000,
+    created_at: randomDate(45),
+    last_active_at: randomDate(0),
+  },
+  {
+    id: 'agent_003',
+    name: 'Finance Reporter',
+    description: 'Generates daily revenue summaries, weekly P&L reports, and monitors transaction anomalies across all networks.',
+    status: 'active',
+    wallet_address: agentWallets[2],
+    wallet_balance: 50000,
+    chain: 'base',
+    capabilities: ['generate_report', 'monitor_activity'],
+    spending_limit_daily: 10000,
+    spending_limit_per_tx: 5000,
+    spent_today: 0,
+    actions_today: 3,
+    total_actions: 156,
+    total_volume: 0,
+    created_at: randomDate(30),
+    last_active_at: randomDate(0),
+  },
+  {
+    id: 'agent_004',
+    name: 'Vendor Payer',
+    description: 'Handles batch vendor payments on a weekly schedule. Currently paused for wallet top-up.',
+    status: 'paused',
+    wallet_address: agentWallets[3],
+    wallet_balance: 1200,
+    chain: 'ethereum',
+    capabilities: ['send_payment'],
+    spending_limit_daily: 1000000,
+    spending_limit_per_tx: 250000,
+    spent_today: 0,
+    actions_today: 0,
+    total_actions: 67,
+    total_volume: 3400000,
+    created_at: randomDate(90),
+    last_active_at: randomDate(3),
+  },
+];
+
+export const mockAgentActions = ([
+  { id: 'aa_001', agent_id: 'agent_001', agent_name: 'Invoice Autopilot', type: 'invoice_created', status: 'completed', title: 'Created invoice for Acme Inc', description: 'Auto-generated monthly consulting invoice for $2,500.00 USDC', entity_id: 'inv_001', entity_type: 'invoice', amount: 250000, tx_hash: null, created_at: randomDate(0) },
+  { id: 'aa_002', agent_id: 'agent_002', agent_name: 'Payment Bot', type: 'payment_sent', status: 'completed', title: 'Vendor payment to Studio Z', description: 'Scheduled weekly payment of $1,200.00 USDC to connected account ca_006', entity_id: 'pi_008', entity_type: 'payment', amount: 120000, tx_hash: `0x${Math.random().toString(16).slice(2)}`, created_at: randomDate(0) },
+  { id: 'aa_003', agent_id: 'agent_003', agent_name: 'Finance Reporter', type: 'report_generated', status: 'completed', title: 'Daily revenue report generated', description: 'Summary: $12,543.20 total volume, 342 payments, 89 active customers', entity_id: null, entity_type: 'report', amount: null, tx_hash: null, created_at: randomDate(0) },
+  { id: 'aa_004', agent_id: 'agent_001', agent_name: 'Invoice Autopilot', type: 'reminder_sent', status: 'completed', title: 'Payment reminder sent', description: 'Sent overdue reminder to user3@example.com for invoice inv_003 ($890.00)', entity_id: 'inv_003', entity_type: 'invoice', amount: 89000, tx_hash: null, created_at: randomDate(0) },
+  { id: 'aa_005', agent_id: 'agent_002', agent_name: 'Payment Bot', type: 'refund_issued', status: 'completed', title: 'Auto-refund processed', description: 'Approved refund of $45.00 USDC for duplicate charge on pi_012', entity_id: 'ref_005', entity_type: 'refund', amount: 4500, tx_hash: `0x${Math.random().toString(16).slice(2)}`, created_at: randomDate(1) },
+  { id: 'aa_006', agent_id: 'agent_003', agent_name: 'Finance Reporter', type: 'anomaly_detected', status: 'completed', title: 'Unusual activity flagged', description: 'Detected 3x spike in failed transactions from 0xdead...beef. Flagged for review.', entity_id: 'cus_004', entity_type: null, amount: null, tx_hash: null, created_at: randomDate(1) },
+  { id: 'aa_007', agent_id: 'agent_002', agent_name: 'Payment Bot', type: 'subscription_renewed', status: 'completed', title: 'Subscription billing collected', description: 'Collected $99.00 USDC for Professional plan renewal (sub_002)', entity_id: 'sub_002', entity_type: 'subscription', amount: 9900, tx_hash: `0x${Math.random().toString(16).slice(2)}`, created_at: randomDate(1) },
+  { id: 'aa_008', agent_id: 'agent_001', agent_name: 'Invoice Autopilot', type: 'invoice_created', status: 'completed', title: 'Batch invoices created', description: 'Auto-generated 4 invoices for end-of-month billing cycle totaling $8,200.00', entity_id: 'inv_005', entity_type: 'invoice', amount: 820000, tx_hash: null, created_at: randomDate(2) },
+  { id: 'aa_009', agent_id: 'agent_002', agent_name: 'Payment Bot', type: 'payment_sent', status: 'failed', title: 'Payment failed — insufficient balance', description: 'Attempted $5,000.00 USDC payment to vendor but agent wallet balance too low', entity_id: null, entity_type: 'payment', amount: 500000, tx_hash: null, created_at: randomDate(2) },
+  { id: 'aa_010', agent_id: 'agent_001', agent_name: 'Invoice Autopilot', type: 'payment_collected', status: 'completed', title: 'Invoice payment received', description: 'Invoice inv_007 paid by customer wallet — $3,500.00 USDC collected', entity_id: 'inv_007', entity_type: 'invoice', amount: 350000, tx_hash: `0x${Math.random().toString(16).slice(2)}`, created_at: randomDate(3) },
+  { id: 'aa_011', agent_id: 'agent_003', agent_name: 'Finance Reporter', type: 'report_generated', status: 'completed', title: 'Weekly P&L report', description: 'Revenue: $34,210.00 | Refunds: $1,240.00 | Net: $32,970.00 | Fees collected: $329.70', entity_id: null, entity_type: 'report', amount: null, tx_hash: null, created_at: randomDate(4) },
+  { id: 'aa_012', agent_id: 'agent_002', agent_name: 'Payment Bot', type: 'payment_sent', status: 'pending', title: 'Scheduled payment queued', description: 'Weekly vendor payment of $2,800.00 USDC queued for execution at next block', entity_id: null, entity_type: 'payment', amount: 280000, tx_hash: null, created_at: randomDate(0) },
+] as AgentAction[]).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
 export const mockVolumeChart = Array.from({ length: 30 }, (_, i) => {
   const d = new Date();

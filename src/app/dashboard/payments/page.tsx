@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Filter, MoreHorizontal, Copy, ExternalLink, Download, Link as LinkIcon } from 'lucide-react';
+import { Search, Filter, MoreHorizontal, Copy, ExternalLink, Download, Link as LinkIcon, Bot, Wallet } from 'lucide-react';
 import { StatusPill } from '@/components/ui/status-pill';
 import { getStatusSummary } from '@/components/ui/status-explainer';
 import { WalletChip } from '@/components/ui/wallet-chip';
@@ -10,7 +10,7 @@ import { ChainBadge } from '@/components/ui/chain-badge';
 import { DataTable, type Column } from '@/components/ui/data-table';
 import { useToast } from '@/components/ui/toast';
 import { formatUSDC, formatRelativeTime, truncateAddress, getExplorerUrl } from '@/lib/utils';
-import { mockPayments } from '@/lib/mock-data';
+import { mockPayments, mockAgents } from '@/lib/mock-data';
 import type { PaymentIntent, PaymentStatus } from '@/types';
 
 const tabs: { label: string; value: PaymentStatus | 'all' }[] = [
@@ -95,6 +95,20 @@ export default function PaymentsPage() {
         <span className="text-sm text-gray-600">{p.customer_email}</span>
       ) : (
         <WalletChip address={p.from_address} chain={p.chain} showExplorer={false} />
+      ),
+    },
+    {
+      key: 'source',
+      header: 'Source',
+      width: '70px',
+      render: (p) => p.initiated_by === 'agent' ? (
+        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-purple-50 text-purple-700 border border-purple-200" title={p.agent_id ? mockAgents.find(a => a.id === p.agent_id)?.name : 'Agent'}>
+          <Bot size={9} /> Agent
+        </span>
+      ) : (
+        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-gray-50 text-gray-500 border border-gray-200">
+          <Wallet size={9} /> Wallet
+        </span>
       ),
     },
     {

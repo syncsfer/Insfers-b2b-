@@ -28,6 +28,8 @@ export interface PaymentIntent {
   confirmed_at: string | null;
   description: string | null;
   receipt_url: string | null;
+  initiated_by: 'human' | 'agent';
+  agent_id: string | null;
 }
 
 export interface Refund {
@@ -84,6 +86,10 @@ export interface Invoice {
   items: InvoiceItem[];
   memo: string | null;
   created_at: string;
+  created_by: 'human' | 'agent';
+  agent_id: string | null;
+  paid_by: 'human' | 'agent' | null;
+  paid_by_agent_id: string | null;
 }
 
 export interface InvoiceItem {
@@ -245,3 +251,70 @@ export type CheckoutState =
   | 'payment_pending'
   | 'payment_succeeded'
   | 'payment_failed';
+
+// AI Agent System
+
+export type AgentStatus = 'active' | 'paused' | 'disabled';
+export type AgentCapability =
+  | 'create_invoice'
+  | 'send_payment'
+  | 'collect_payment'
+  | 'generate_report'
+  | 'manage_subscriptions'
+  | 'issue_refund'
+  | 'monitor_activity';
+
+export type AgentActionType =
+  | 'invoice_created'
+  | 'payment_sent'
+  | 'payment_collected'
+  | 'report_generated'
+  | 'subscription_renewed'
+  | 'refund_issued'
+  | 'anomaly_detected'
+  | 'reminder_sent';
+
+export type AgentActionStatus = 'completed' | 'pending' | 'failed';
+
+export interface AIAgent {
+  id: string;
+  name: string;
+  description: string;
+  status: AgentStatus;
+  wallet_address: string;
+  wallet_balance: number;
+  chain: Chain;
+  capabilities: AgentCapability[];
+  spending_limit_daily: number;
+  spending_limit_per_tx: number;
+  spent_today: number;
+  actions_today: number;
+  total_actions: number;
+  total_volume: number;
+  created_at: string;
+  last_active_at: string;
+}
+
+export interface AgentAction {
+  id: string;
+  agent_id: string;
+  agent_name: string;
+  type: AgentActionType;
+  status: AgentActionStatus;
+  title: string;
+  description: string;
+  entity_id: string | null;
+  entity_type: 'invoice' | 'payment' | 'refund' | 'subscription' | 'report' | null;
+  amount: number | null;
+  tx_hash: string | null;
+  created_at: string;
+}
+
+export type InitiatedBy = 'human' | 'agent';
+
+export interface AgentDetection {
+  initiated_by: InitiatedBy;
+  agent_id: string | null;
+  agent_name: string | null;
+  confidence: number;
+}

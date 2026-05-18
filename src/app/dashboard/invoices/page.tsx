@@ -2,14 +2,14 @@
 
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { Plus, Send, Eye, MoreHorizontal, Copy, ExternalLink, CheckCircle2 } from 'lucide-react';
+import { Plus, Send, Eye, MoreHorizontal, Copy, ExternalLink, CheckCircle2, Bot, Wallet } from 'lucide-react';
 import { StatusPill } from '@/components/ui/status-pill';
 import { getStatusSummary } from '@/components/ui/status-explainer';
 import { DataTable, type Column } from '@/components/ui/data-table';
 import { Modal } from '@/components/ui/modal';
 import { useToast } from '@/components/ui/toast';
 import { formatUSDC, formatRelativeTime, formatDate } from '@/lib/utils';
-import { mockInvoices } from '@/lib/mock-data';
+import { mockInvoices, mockAgents } from '@/lib/mock-data';
 import type { Invoice } from '@/types';
 
 const tabs = [
@@ -81,6 +81,32 @@ export default function InvoicesPage() {
         const isOverdue = new Date(inv.due_date) < new Date() && inv.status !== 'paid' && inv.status !== 'void';
         return <span className={`text-sm ${isOverdue ? 'text-red-600 font-medium' : 'text-gray-500'}`}>{formatDate(inv.due_date).split(',')[0]}</span>;
       },
+    },
+    {
+      key: 'created_by', header: 'Created By', width: '90px',
+      render: (inv) => inv.created_by === 'agent' ? (
+        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-purple-50 text-purple-700 border border-purple-200" title={inv.agent_id ? mockAgents.find(a => a.id === inv.agent_id)?.name : 'Agent'}>
+          <Bot size={9} /> Agent
+        </span>
+      ) : (
+        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-gray-50 text-gray-500 border border-gray-200">
+          <Wallet size={9} /> Human
+        </span>
+      ),
+    },
+    {
+      key: 'paid_by', header: 'Paid By', width: '90px',
+      render: (inv) => inv.paid_by === 'agent' ? (
+        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-purple-50 text-purple-700 border border-purple-200" title={inv.paid_by_agent_id ? mockAgents.find(a => a.id === inv.paid_by_agent_id)?.name : 'Agent'}>
+          <Bot size={9} /> Agent
+        </span>
+      ) : inv.paid_by === 'human' ? (
+        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-gray-50 text-gray-500 border border-gray-200">
+          <Wallet size={9} /> Wallet
+        </span>
+      ) : (
+        <span className="text-gray-300">-</span>
+      ),
     },
     {
       key: 'paid', header: 'Paid At', width: '120px',
