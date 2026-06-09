@@ -8,6 +8,33 @@ export type HoldStatus = 'active' | 'captured' | 'released' | 'expired';
 export type SubscriptionStatus = 'active' | 'past_due' | 'canceled' | 'expired' | 'trialing';
 export type ConnectedAccountStatus = 'onboarding' | 'active' | 'suspended';
 export type PayoutStatus = 'pending' | 'processing' | 'completed' | 'failed';
+export type TransferStatus = 'draft' | 'pending' | 'confirming' | 'completed' | 'failed';
+
+export interface Transfer {
+  id: string;
+  recipient_address: string;
+  recipient_label: string | null;
+  amount: number;
+  fee: number;
+  net_amount: number;
+  chain: Chain;
+  status: TransferStatus;
+  tx_hash: string | null;
+  memo: string | null;
+  created_at: string;
+  confirmed_at: string | null;
+}
+
+export interface SavedRecipient {
+  id: string;
+  label: string;
+  address: string;
+  chain: Chain;
+  total_sent: number;
+  transfer_count: number;
+  last_sent_at: string | null;
+  created_at: string;
+}
 
 export interface PaymentIntent {
   id: string;

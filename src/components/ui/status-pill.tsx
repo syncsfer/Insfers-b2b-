@@ -11,7 +11,8 @@ type StatusVariant =
   | 'onboarding' | 'suspended'
   | 'created' | 'completed'
   | 'review' | 'low' | 'medium' | 'high'
-  | 'paused' | 'disabled';
+  | 'paused' | 'disabled'
+  | 'confirming';
 
 const variantStyles: Record<string, { bg: string; text: string; border: string }> = {
   succeeded:        { bg: 'bg-success-bg',  text: 'text-success-text',  border: 'border-success-border' },
@@ -41,6 +42,7 @@ const variantStyles: Record<string, { bg: string; text: string; border: string }
   void:             { bg: 'bg-neutral-bg',  text: 'text-[#6b7280]',     border: 'border-neutral-border' },
   awaiting_claim:   { bg: 'bg-claim-bg',    text: 'text-claim-text',    border: 'border-claim-border' },
   paused:           { bg: 'bg-warning-bg',  text: 'text-warning-text',  border: 'border-warning-border' },
+  confirming:       { bg: 'bg-info-bg',     text: 'text-info-text',     border: 'border-info-border' },
   disabled:         { bg: 'bg-neutral-bg',  text: 'text-[#6b7280]',     border: 'border-neutral-border' },
 };
 
@@ -72,6 +74,7 @@ const labels: Record<string, string> = {
   medium: 'Medium',
   high: 'High',
   paused: 'Paused',
+  confirming: 'Confirming',
   disabled: 'Disabled',
 };
 

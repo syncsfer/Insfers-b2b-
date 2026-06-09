@@ -2,7 +2,7 @@ import type {
   PaymentIntent, Refund, Customer, PaymentLink, Invoice,
   WebhookEndpoint, ApiKey, WebhookLog, TimelineEvent, DashboardKPIs,
   Chain, Hold, Subscription, Plan, ConnectedAccount, Payout,
-  ActionItem, AIAgent, AgentAction,
+  ActionItem, AIAgent, AgentAction, Transfer, SavedRecipient,
 } from '@/types';
 
 const chains: Chain[] = ['base', 'ethereum', 'polygon', 'arbitrum', 'optimism'];
@@ -383,6 +383,42 @@ export const mockAgentActions = ([
   { id: 'aa_011', agent_id: 'agent_003', agent_name: 'Finance Reporter', type: 'report_generated', status: 'completed', title: 'Weekly P&L report', description: 'Revenue: $34,210.00 | Refunds: $1,240.00 | Net: $32,970.00 | Fees collected: $329.70', entity_id: null, entity_type: 'report', amount: null, tx_hash: null, created_at: randomDate(4) },
   { id: 'aa_012', agent_id: 'agent_002', agent_name: 'Payment Bot', type: 'payment_sent', status: 'pending', title: 'Scheduled payment queued', description: 'Weekly vendor payment of $2,800.00 USDC queued for execution at next block', entity_id: null, entity_type: 'payment', amount: 280000, tx_hash: null, created_at: randomDate(0) },
 ] as AgentAction[]).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+// Transfers (Send Money)
+
+export const mockSavedRecipients: SavedRecipient[] = [
+  { id: 'rcpt_001', label: 'Vendor A — Studio Z', address: '0xfeed9876face5432feed9876face5432feed9876', chain: 'base', total_sent: 1250000, transfer_count: 8, last_sent_at: randomDate(2), created_at: randomDate(60) },
+  { id: 'rcpt_002', label: 'Freelancer — Jake M.', address: '0xcafe1234babe5678cafe1234babe5678cafe1234', chain: 'base', total_sent: 480000, transfer_count: 4, last_sent_at: randomDate(5), created_at: randomDate(45) },
+  { id: 'rcpt_003', label: 'Partner Co Treasury', address: '0xabcdef1234567890abcdef1234567890abcdef12', chain: 'ethereum', total_sent: 5000000, transfer_count: 12, last_sent_at: randomDate(1), created_at: randomDate(90) },
+  { id: 'rcpt_004', label: 'Marketing Agency', address: '0xdeadbeef12345678deadbeef12345678deadbeef', chain: 'polygon', total_sent: 750000, transfer_count: 3, last_sent_at: randomDate(14), created_at: randomDate(30) },
+  { id: 'rcpt_005', label: 'Employee Payroll Wallet', address: '0x9876543210fedcba9876543210fedcba98765432', chain: 'arbitrum', total_sent: 3200000, transfer_count: 16, last_sent_at: randomDate(0), created_at: randomDate(120) },
+  { id: 'rcpt_006', label: 'AWS Cloud Credits', address: '0x1a2b3c4d5e6f7890abcdef1234567890abcdef12', chain: 'optimism', total_sent: 190000, transfer_count: 2, last_sent_at: randomDate(20), created_at: randomDate(40) },
+];
+
+export const mockTransfers: Transfer[] = Array.from({ length: 20 }, (_, i) => {
+  const amount = Math.floor(Math.random() * 200000) + 5000;
+  const fee = Math.floor(amount * 0.001);
+  const statuses: Transfer['status'][] = ['completed', 'completed', 'completed', 'completed', 'pending', 'confirming', 'failed'];
+  const status = statuses[Math.floor(Math.random() * statuses.length)] as Transfer['status'];
+  const chain = chains[Math.floor(Math.random() * chains.length)];
+  const created = randomDate(30);
+  const recipient = mockSavedRecipients[Math.floor(Math.random() * mockSavedRecipients.length)];
+
+  return {
+    id: `txfr_${String(i + 1).padStart(3, '0')}${Math.random().toString(36).slice(2, 8)}`,
+    recipient_address: recipient.address,
+    recipient_label: Math.random() > 0.3 ? recipient.label : null,
+    amount,
+    fee,
+    net_amount: amount + fee,
+    chain,
+    status,
+    tx_hash: ['completed', 'confirming'].includes(status) ? `0x${Math.random().toString(16).slice(2)}${Math.random().toString(16).slice(2)}` : null,
+    memo: ['Vendor payment', 'Monthly retainer', 'Invoice settlement', 'Payroll', null, null][Math.floor(Math.random() * 6)],
+    created_at: created,
+    confirmed_at: status === 'completed' ? new Date(new Date(created).getTime() + 5000).toISOString() : null,
+  };
+}).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
 export const mockVolumeChart = Array.from({ length: 30 }, (_, i) => {
   const d = new Date();

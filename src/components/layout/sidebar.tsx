@@ -6,13 +6,14 @@ import {
   LayoutDashboard, CreditCard, RotateCcw, Users, LinkIcon,
   FileText, BarChart3, Code2, Settings, Zap, TestTube,
   ShieldCheck, RefreshCw, GitBranch, ArrowLeftRight, HelpCircle,
-  AlertCircle, Bot,
+  AlertCircle, Bot, Send,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navItems: { label: string; href: string; icon: React.ElementType; badge?: boolean }[] = [
   { label: 'Home', href: '/dashboard', icon: LayoutDashboard },
   { label: 'Action Center', href: '/dashboard/actions', icon: AlertCircle, badge: true },
+  { label: 'Send Money', href: '/dashboard/send', icon: Send },
   { label: 'Payments', href: '/dashboard/payments', icon: CreditCard },
   { label: 'Refunds', href: '/dashboard/refunds', icon: RotateCcw },
   { label: 'Holds', href: '/dashboard/holds', icon: ShieldCheck },
