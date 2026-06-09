@@ -1,15 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { Building, Wallet, Users, Shield, Palette, Save, Plus, Trash2 } from 'lucide-react';
-import { WalletChip } from '@/components/ui/wallet-chip';
-import { ChainBadge } from '@/components/ui/chain-badge';
+import { Building, Users, Shield, Palette, Save, Plus, Trash2 } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
-import type { Chain } from '@/types';
 
 const settingsTabs = [
   { key: 'business', label: 'Business', icon: Building },
-  { key: 'wallets', label: 'Wallets', icon: Wallet },
   { key: 'team', label: 'Team', icon: Users },
   { key: 'security', label: 'Security', icon: Shield },
   { key: 'branding', label: 'Branding', icon: Palette },
@@ -73,40 +69,6 @@ export default function SettingsPage() {
                 <button onClick={() => toast('Settings saved')} className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700">
                   <Save size={14} /> Save changes
                 </button>
-              </div>
-            </div>
-          )}
-
-          {/* Wallets */}
-          {activeTab === 'wallets' && (
-            <div className="space-y-4">
-              <div className="bg-white border border-gray-200 rounded-xl p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-1">Settlement Wallets</h2>
-                <p className="text-sm text-gray-500 mb-6">Where you receive payments. You can set different wallets per chain.</p>
-                <div className="space-y-3">
-                  {(['base', 'ethereum', 'polygon'] as Chain[]).map(chain => (
-                    <div key={chain} className="flex items-center gap-4 p-3 border border-gray-200 rounded-lg">
-                      <ChainBadge chain={chain} />
-                      <WalletChip address="0x7777777777777777777777777777777777777777" chain={chain} />
-                      <span className="text-xs text-green-600 font-medium ml-auto">Active</span>
-                    </div>
-                  ))}
-                </div>
-                <button className="mt-4 inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50">
-                  <Plus size={14} /> Add wallet
-                </button>
-              </div>
-              <div className="bg-white border border-gray-200 rounded-xl p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-1">Accepted Networks</h2>
-                <p className="text-sm text-gray-500 mb-4">Enable or disable chains for your checkout</p>
-                <div className="space-y-2">
-                  {(['base', 'ethereum', 'polygon', 'arbitrum', 'optimism'] as Chain[]).map(chain => (
-                    <label key={chain} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
-                      <ChainBadge chain={chain} />
-                      <input type="checkbox" defaultChecked={['base', 'ethereum', 'polygon'].includes(chain)} className="rounded" />
-                    </label>
-                  ))}
-                </div>
               </div>
             </div>
           )}

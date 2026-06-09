@@ -12,7 +12,8 @@ type StatusVariant =
   | 'created' | 'completed'
   | 'review' | 'low' | 'medium' | 'high'
   | 'paused' | 'disabled'
-  | 'confirming';
+  | 'confirming'
+  | 'inactive';
 
 const variantStyles: Record<string, { bg: string; text: string; border: string }> = {
   succeeded:        { bg: 'bg-success-bg',  text: 'text-success-text',  border: 'border-success-border' },
@@ -44,6 +45,7 @@ const variantStyles: Record<string, { bg: string; text: string; border: string }
   paused:           { bg: 'bg-warning-bg',  text: 'text-warning-text',  border: 'border-warning-border' },
   confirming:       { bg: 'bg-info-bg',     text: 'text-info-text',     border: 'border-info-border' },
   disabled:         { bg: 'bg-neutral-bg',  text: 'text-[#6b7280]',     border: 'border-neutral-border' },
+  inactive:         { bg: 'bg-neutral-bg',  text: 'text-[#6b7280]',     border: 'border-neutral-border' },
 };
 
 const labels: Record<string, string> = {
@@ -76,6 +78,7 @@ const labels: Record<string, string> = {
   paused: 'Paused',
   confirming: 'Confirming',
   disabled: 'Disabled',
+  inactive: 'Inactive',
 };
 
 interface StatusPillProps {
