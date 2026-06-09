@@ -28,6 +28,8 @@ export interface Transfer {
 export interface SavedRecipient {
   id: string;
   label: string;
+  full_name: string;
+  email: string | null;
   address: string;
   chain: Chain;
   total_sent: number;

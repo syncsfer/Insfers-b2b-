@@ -387,12 +387,12 @@ export const mockAgentActions = ([
 // Transfers (Send Money)
 
 export const mockSavedRecipients: SavedRecipient[] = [
-  { id: 'rcpt_001', label: 'Vendor A — Studio Z', address: '0xfeed9876face5432feed9876face5432feed9876', chain: 'base', total_sent: 1250000, transfer_count: 8, last_sent_at: randomDate(2), created_at: randomDate(60) },
-  { id: 'rcpt_002', label: 'Freelancer — Jake M.', address: '0xcafe1234babe5678cafe1234babe5678cafe1234', chain: 'base', total_sent: 480000, transfer_count: 4, last_sent_at: randomDate(5), created_at: randomDate(45) },
-  { id: 'rcpt_003', label: 'Partner Co Treasury', address: '0xabcdef1234567890abcdef1234567890abcdef12', chain: 'ethereum', total_sent: 5000000, transfer_count: 12, last_sent_at: randomDate(1), created_at: randomDate(90) },
-  { id: 'rcpt_004', label: 'Marketing Agency', address: '0xdeadbeef12345678deadbeef12345678deadbeef', chain: 'polygon', total_sent: 750000, transfer_count: 3, last_sent_at: randomDate(14), created_at: randomDate(30) },
-  { id: 'rcpt_005', label: 'Employee Payroll Wallet', address: '0x9876543210fedcba9876543210fedcba98765432', chain: 'arbitrum', total_sent: 3200000, transfer_count: 16, last_sent_at: randomDate(0), created_at: randomDate(120) },
-  { id: 'rcpt_006', label: 'AWS Cloud Credits', address: '0x1a2b3c4d5e6f7890abcdef1234567890abcdef12', chain: 'optimism', total_sent: 190000, transfer_count: 2, last_sent_at: randomDate(20), created_at: randomDate(40) },
+  { id: 'rcpt_001', label: 'Vendor A — Studio Z', full_name: 'Sarah Chen', email: 'sarah@studioz.com', address: '0xfeed9876face5432feed9876face5432feed9876', chain: 'base', total_sent: 1250000, transfer_count: 8, last_sent_at: randomDate(2), created_at: randomDate(60) },
+  { id: 'rcpt_002', label: 'Freelancer — Jake M.', full_name: 'Jake Morrison', email: 'jake.m@gmail.com', address: '0xcafe1234babe5678cafe1234babe5678cafe1234', chain: 'base', total_sent: 480000, transfer_count: 4, last_sent_at: randomDate(5), created_at: randomDate(45) },
+  { id: 'rcpt_003', label: 'Partner Co Treasury', full_name: 'Lisa Park', email: 'treasury@partnerco.io', address: '0xabcdef1234567890abcdef1234567890abcdef12', chain: 'ethereum', total_sent: 5000000, transfer_count: 12, last_sent_at: randomDate(1), created_at: randomDate(90) },
+  { id: 'rcpt_004', label: 'Marketing Agency', full_name: 'David Okonkwo', email: 'billing@adagency.co', address: '0xdeadbeef12345678deadbeef12345678deadbeef', chain: 'polygon', total_sent: 750000, transfer_count: 3, last_sent_at: randomDate(14), created_at: randomDate(30) },
+  { id: 'rcpt_005', label: 'Employee Payroll Wallet', full_name: 'Maria Rodriguez', email: 'payroll@acme.com', address: '0x9876543210fedcba9876543210fedcba98765432', chain: 'arbitrum', total_sent: 3200000, transfer_count: 16, last_sent_at: randomDate(0), created_at: randomDate(120) },
+  { id: 'rcpt_006', label: 'AWS Cloud Credits', full_name: 'Tom Nguyen', email: null, address: '0x1a2b3c4d5e6f7890abcdef1234567890abcdef12', chain: 'optimism', total_sent: 190000, transfer_count: 2, last_sent_at: randomDate(20), created_at: randomDate(40) },
 ];
 
 export const mockTransfers: Transfer[] = Array.from({ length: 20 }, (_, i) => {

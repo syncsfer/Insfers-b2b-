@@ -58,6 +58,8 @@ export default function SendMoneyPage() {
   // Add recipient modal
   const [addRecipientOpen, setAddRecipientOpen] = useState(false);
   const [newRecipientLabel, setNewRecipientLabel] = useState('');
+  const [newRecipientName, setNewRecipientName] = useState('');
+  const [newRecipientEmail, setNewRecipientEmail] = useState('');
   const [newRecipientAddress, setNewRecipientAddress] = useState('');
   const [newRecipientChain, setNewRecipientChain] = useState<Chain>('base');
 
@@ -267,7 +269,8 @@ export default function SendMoneyPage() {
                                 </div>
                                 <div className="flex-1 min-w-0">
                                   <div className="text-sm font-medium text-gray-900">{r.label}</div>
-                                  <div className="text-xs text-gray-500 font-mono">{truncateAddress(r.address)}</div>
+                                  <div className="text-xs text-gray-500">{r.full_name}{r.email ? ` · ${r.email}` : ''}</div>
+                                  <div className="text-[10px] text-gray-400 font-mono">{truncateAddress(r.address)}</div>
                                 </div>
                                 <ChainBadge chain={r.chain} />
                               </button>
@@ -634,7 +637,11 @@ export default function SendMoneyPage() {
                     <span className="text-sm font-semibold text-gray-900">{r.label}</span>
                     <ChainBadge chain={r.chain} />
                   </div>
-                  <div className="font-mono text-xs text-gray-500 mt-0.5">{r.address}</div>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-xs text-gray-600">{r.full_name}</span>
+                    {r.email && <span className="text-xs text-gray-400">&middot; {r.email}</span>}
+                  </div>
+                  <div className="font-mono text-xs text-gray-400 mt-0.5">{r.address}</div>
                 </div>
                 <div className="text-right shrink-0">
                   <div className="text-sm font-semibold text-gray-900">{formatUSDC(r.total_sent)}</div>
@@ -661,7 +668,7 @@ export default function SendMoneyPage() {
           {/* Add Recipient Modal */}
           <Modal
             open={addRecipientOpen}
-            onClose={() => { setAddRecipientOpen(false); setNewRecipientLabel(''); setNewRecipientAddress(''); setNewRecipientChain('base'); }}
+            onClose={() => { setAddRecipientOpen(false); setNewRecipientLabel(''); setNewRecipientName(''); setNewRecipientEmail(''); setNewRecipientAddress(''); setNewRecipientChain('base'); }}
             title="Add Recipient"
             footer={
               <div className="flex gap-3">
@@ -669,8 +676,8 @@ export default function SendMoneyPage() {
                   Cancel
                 </button>
                 <button
-                  onClick={() => { toast('Recipient saved'); setAddRecipientOpen(false); setNewRecipientLabel(''); setNewRecipientAddress(''); }}
-                  disabled={!newRecipientLabel || !/^0x[a-fA-F0-9]{40}$/.test(newRecipientAddress)}
+                  onClick={() => { toast('Recipient saved'); setAddRecipientOpen(false); setNewRecipientLabel(''); setNewRecipientName(''); setNewRecipientEmail(''); setNewRecipientAddress(''); }}
+                  disabled={!newRecipientLabel || !newRecipientName || !/^0x[a-fA-F0-9]{40}$/.test(newRecipientAddress)}
                   className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
                 >
                   Save Recipient
@@ -688,6 +695,28 @@ export default function SendMoneyPage() {
                   placeholder="e.g. Vendor A, Marketing Agency"
                   className="w-full mt-1 px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Full Name</label>
+                  <input
+                    type="text"
+                    value={newRecipientName}
+                    onChange={e => setNewRecipientName(e.target.value)}
+                    placeholder="John Doe"
+                    className="w-full mt-1 px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Email</label>
+                  <input
+                    type="email"
+                    value={newRecipientEmail}
+                    onChange={e => setNewRecipientEmail(e.target.value)}
+                    placeholder="john@example.com"
+                    className="w-full mt-1 px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-700">Wallet Address</label>
