@@ -59,7 +59,7 @@ export const mockPayments: PaymentIntent[] = Array.from({ length: 50 }, (_, i) =
     confirmed_at: status === 'succeeded' ? new Date(new Date(created).getTime() + 3000).toISOString() : null,
     description: ['Monthly subscription', 'One-time purchase', 'Invoice payment', 'Service fee', null][Math.floor(Math.random() * 5)],
     receipt_url: status === 'succeeded' ? `/r/${receiptIdForPayment(id)}` : null,
-    initiated_by: isAgent ? 'agent' as 'agent' : 'human' as 'human',
+    initiated_by: (isAgent ? 'agent' : 'human') as PaymentIntent['initiated_by'],
     agent_id: isAgent ? ['agent_001', 'agent_002', 'agent_003'][Math.floor(Math.random() * 3)] : null,
   };
 }).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());

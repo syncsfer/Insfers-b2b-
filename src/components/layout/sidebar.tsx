@@ -6,9 +6,24 @@ import {
   LayoutDashboard, CreditCard, RotateCcw, Users, LinkIcon,
   FileText, BarChart3, Code2, Settings, Zap, TestTube,
   ShieldCheck, RefreshCw, GitBranch, ArrowLeftRight, HelpCircle,
-  AlertCircle, Bot, Send, Wallet,
+  AlertCircle, Bot, Send, Wallet, LogOut,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+
+export interface SidebarUser {
+  name: string | null;
+  email: string | null;
+  picture: string | null;
+}
+
+/** Two-letter monogram for the avatar fallback. */
+function initials(user: SidebarUser): string {
+  const source = user.name || user.email || '';
+  const parts = source.trim().split(/[\s@._-]+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[1][0]).toUpperCase();
+}
 
 const navItems: { label: string; href: string; icon: React.ElementType; badge?: boolean }[] = [
   { label: 'Home', href: '/dashboard', icon: LayoutDashboard },
@@ -30,7 +45,7 @@ const navItems: { label: string; href: string; icon: React.ElementType; badge?: 
   { label: 'Settings', href: '/dashboard/settings', icon: Settings },
 ];
 
-export function Sidebar() {
+export function Sidebar({ user }: { user?: SidebarUser }) {
   const pathname = usePathname();
 
   return (
@@ -95,13 +110,34 @@ export function Sidebar() {
           <ShieldCheck size={13} /> Trust & Security
         </Link>
         <div className="flex items-center gap-3 px-3 py-2">
-          <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 text-xs font-bold">
-            AC
-          </div>
+          {user?.picture ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={user.picture}
+              alt=""
+              className="w-8 h-8 rounded-full object-cover shrink-0"
+            />
+          ) : (
+            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 text-xs font-bold shrink-0">
+              {user ? initials(user) : 'AC'}
+            </div>
+          )}
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-gray-900 truncate">Acme Corp</p>
-            <p className="text-[11px] text-gray-500 truncate">admin@acme.com</p>
+            <p className="text-sm font-medium text-gray-900 truncate">
+              {user?.name || user?.email || 'Acme Corp'}
+            </p>
+            <p className="text-[11px] text-gray-500 truncate">
+              {user?.email || 'admin@acme.com'}
+            </p>
           </div>
+          <a
+            href="/auth/logout"
+            title="Sign out"
+            aria-label="Sign out"
+            className="p-1.5 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 shrink-0"
+          >
+            <LogOut size={15} />
+          </a>
         </div>
       </div>
     </aside>
