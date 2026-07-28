@@ -78,6 +78,16 @@ body {
   background-color: #f9fafb;
 }
 
+/* Hairline grid used behind the auth brand panel */
+.auth-grid {
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.5) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.5) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 40%, #000 30%, transparent 75%);
+  -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 40%, #000 30%, transparent 75%);
+}
+
 /* Animation for success checkmark */
 @keyframes checkmark-draw {
   from { stroke-dashoffset: 100; }

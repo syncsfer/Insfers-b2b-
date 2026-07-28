@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { Zap, ShieldCheck, ArrowRight } from 'lucide-react';
+import { ArrowRight, ShieldCheck, Fingerprint } from 'lucide-react';
 import { auth0 } from '@/lib/auth0';
 
 export default async function LoginPage({
@@ -21,45 +21,51 @@ export default async function LoginPage({
   const loginHref = `/auth/login?returnTo=${encodeURIComponent(safeReturnTo)}`;
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        {/* Logo */}
-        <div className="flex items-center justify-center gap-2 mb-8">
-          <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center">
-            <Zap size={20} className="text-white" />
-          </div>
-          <span className="text-xl font-bold text-gray-900">Chain Payments</span>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
-          <h1 className="text-xl font-bold text-gray-900 mb-1">Sign in</h1>
-          <p className="text-sm text-gray-500 mb-6">
-            Access your dashboard to manage payments, wallets, and payouts.
-          </p>
-
-          <a
-            href={loginHref}
-            className="w-full py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2 transition-colors"
-          >
-            Continue to sign in <ArrowRight size={15} />
-          </a>
-
-          <div className="mt-5 flex items-start gap-2 text-xs text-gray-500">
-            <ShieldCheck size={14} className="text-gray-400 mt-0.5 shrink-0" />
-            <p>
-              You&apos;ll sign in through our secure identity provider. Multi-factor
-              authentication and password recovery are handled there.
-            </p>
-          </div>
-
-          <p className="mt-6 text-center text-sm text-gray-500">
-            Don&apos;t have an account?{' '}
-            <Link href="/signup" className="text-blue-600 font-medium hover:text-blue-700">
-              Sign up
-            </Link>
-          </p>
-        </div>
+    <div>
+      <div className="mb-8">
+        <h1 className="text-[1.75rem] font-semibold tracking-tight text-gray-900">
+          Welcome back
+        </h1>
+        <p className="mt-2 text-[15px] leading-relaxed text-gray-500">
+          Sign in to manage payments, wallets, and payouts.
+        </p>
       </div>
+
+      {returnTo && (
+        <div className="mb-6 flex items-start gap-2.5 rounded-xl border border-blue-100 bg-blue-50/70 px-4 py-3">
+          <Fingerprint size={15} className="mt-0.5 shrink-0 text-blue-600" />
+          <p className="text-[13px] leading-relaxed text-blue-900">
+            Sign in to continue to{' '}
+            <span className="font-medium">{safeReturnTo}</span>
+          </p>
+        </div>
+      )}
+
+      <a
+        href={loginHref}
+        className="group flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-blue-600 text-[15px] font-medium text-white shadow-sm shadow-blue-600/20 transition-all hover:bg-blue-700 hover:shadow-md hover:shadow-blue-600/25 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 active:scale-[0.99]"
+      >
+        Continue to sign in
+        <ArrowRight size={16} className="transition-transform group-hover:translate-x-0.5" />
+      </a>
+
+      <div className="mt-6 flex items-start gap-2.5 rounded-xl border border-gray-100 bg-gray-50/70 px-4 py-3.5">
+        <ShieldCheck size={15} className="mt-0.5 shrink-0 text-gray-400" />
+        <p className="text-[12.5px] leading-relaxed text-gray-500">
+          You&apos;ll sign in through our secure identity provider. Multi-factor
+          authentication and password recovery are handled there.
+        </p>
+      </div>
+
+      <p className="mt-8 text-center text-sm text-gray-500">
+        Don&apos;t have an account?{' '}
+        <Link
+          href="/signup"
+          className="font-medium text-blue-600 transition-colors hover:text-blue-700"
+        >
+          Create one
+        </Link>
+      </p>
     </div>
   );
 }
