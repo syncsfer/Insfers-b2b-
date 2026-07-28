@@ -3,6 +3,7 @@ import type {
   WebhookEndpoint, ApiKey, WebhookLog, TimelineEvent, DashboardKPIs,
   Chain, Hold, Subscription, Plan, ConnectedAccount, Payout,
   ActionItem, AIAgent, AgentAction, Transfer, SavedRecipient,
+  Receipt, ReceiptSettings,
 } from '@/types';
 
 const chains: Chain[] = ['base', 'ethereum', 'polygon', 'arbitrum', 'optimism'];
@@ -16,6 +17,11 @@ const addresses = [
 ];
 
 const merchantAddress = '0x7777777777777777777777777777777777777777';
+
+/** Receipt ids are derived from the payment id so links stay stable across renders. */
+export function receiptIdForPayment(paymentId: string): string {
+  return `rcpt_${paymentId.replace(/^pi_/, '')}`;
+}
 
 function randomDate(daysBack: number): string {
   const d = new Date();
@@ -32,9 +38,10 @@ export const mockPayments: PaymentIntent[] = Array.from({ length: 50 }, (_, i) =
   const chain = chains[Math.floor(Math.random() * chains.length)];
   const created = randomDate(30);
   const isAgent = Math.random() > 0.75;
+  const id = `pi_${String(i + 1).padStart(3, '0')}${Math.random().toString(36).slice(2, 10)}`;
 
   return {
-    id: `pi_${String(i + 1).padStart(3, '0')}${Math.random().toString(36).slice(2, 10)}`,
+    id,
     amount,
     status,
     chain,
@@ -51,7 +58,7 @@ export const mockPayments: PaymentIntent[] = Array.from({ length: 50 }, (_, i) =
     created_at: created,
     confirmed_at: status === 'succeeded' ? new Date(new Date(created).getTime() + 3000).toISOString() : null,
     description: ['Monthly subscription', 'One-time purchase', 'Invoice payment', 'Service fee', null][Math.floor(Math.random() * 5)],
-    receipt_url: status === 'succeeded' ? `https://pay.chainpayments.com/receipt/r_${i}` : null,
+    receipt_url: status === 'succeeded' ? `/r/${receiptIdForPayment(id)}` : null,
     initiated_by: isAgent ? 'agent' as 'agent' : 'human' as 'human',
     agent_id: isAgent ? ['agent_001', 'agent_002', 'agent_003'][Math.floor(Math.random() * 3)] : null,
   };
@@ -419,6 +426,58 @@ export const mockTransfers: Transfer[] = Array.from({ length: 20 }, (_, i) => {
     confirmed_at: status === 'completed' ? new Date(new Date(created).getTime() + 5000).toISOString() : null,
   };
 }).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+// Email Receipts
+
+export const mockReceiptSettings: ReceiptSettings = {
+  auto_send: true,
+  from_name: 'Acme Corp',
+  reply_to: 'support@acme.com',
+  bcc_email: 'receipts@acme.com',
+  subject_template: 'Your receipt from {{merchant}} — {{amount}}',
+  footer_message: 'Thank you for your business. Questions? Reply to this email.',
+  include_tx_link: true,
+  attach_pdf: true,
+};
+
+export const mockReceipts: Receipt[] = mockPayments
+  .filter(p => p.status === 'succeeded' && p.customer_email)
+  .map((p) => {
+    // Most receipts land; a few fail or bounce so the UI shows real states.
+    const roll = Math.random();
+    const status: Receipt['status'] =
+      roll > 0.88 ? 'bounced' : roll > 0.82 ? 'failed' : roll > 0.72 ? 'pending' :
+      roll > 0.45 ? 'opened' : roll > 0.2 ? 'delivered' : 'sent';
+
+    const failed = status === 'failed' || status === 'bounced';
+    const sentAt = status === 'pending' ? null : new Date(new Date(p.created_at).getTime() + 4000).toISOString();
+
+    const id = receiptIdForPayment(p.id);
+
+    return {
+      id,
+      payment_intent_id: p.id,
+      customer_email: p.customer_email!,
+      status,
+      amount: p.amount,
+      chain: p.chain,
+      tx_hash: p.tx_hash,
+      receipt_url: `/r/${id}`,
+      sent_at: sentAt,
+      delivered_at: ['delivered', 'opened'].includes(status) && sentAt
+        ? new Date(new Date(sentAt).getTime() + 2000).toISOString() : null,
+      opened_at: status === 'opened' && sentAt
+        ? new Date(new Date(sentAt).getTime() + 900000).toISOString() : null,
+      attempts: failed ? 3 : status === 'pending' ? 0 : 1,
+      error_message: status === 'bounced'
+        ? 'Recipient mailbox does not exist (SMTP 550)'
+        : status === 'failed'
+          ? 'Delivery timed out after 3 attempts'
+          : null,
+      created_at: p.created_at,
+    };
+  })
+  .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
 export const mockVolumeChart = Array.from({ length: 30 }, (_, i) => {
   const d = new Date();

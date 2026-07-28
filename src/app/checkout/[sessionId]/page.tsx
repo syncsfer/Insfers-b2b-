@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Wallet, AlertTriangle, Loader2, Check, X, ExternalLink, Copy, ChevronDown, ShieldCheck } from 'lucide-react';
+import { Wallet, AlertTriangle, Loader2, Check, X, ExternalLink, Copy, ChevronDown, ShieldCheck, Mail } from 'lucide-react';
 import { ChainBadge } from '@/components/ui/chain-badge';
 import { formatUSDC, truncateAddress, getExplorerUrl } from '@/lib/utils';
 import type { CheckoutState, Chain } from '@/types';
@@ -50,12 +50,17 @@ function WalletButton({ name, color, onClick }: { name: string; color: string; o
 export default function CheckoutPage() {
   const [state, setState] = useState<CheckoutState>('not_connected');
   const [connectedWallet, setConnectedWallet] = useState('');
+  const [email, setEmail] = useState('');
+  const [emailTouched, setEmailTouched] = useState(false);
   const chain: Chain = 'base';
   const amount = 5000;
   const fee = 2;
   const total = amount + fee;
   const merchantName = 'Acme Corp';
   const txHash = '0xabc123def456789abc123def456789abc123def456789abc123def456789abcd';
+  const receiptUrl = '/r/rcpt_demo';
+
+  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
   const currentStep = state === 'not_connected' || state === 'connecting' ? 0 :
     state === 'wrong_chain' || state === 'checking_balance' || state === 'insufficient_usdc' ||
@@ -248,12 +253,40 @@ export default function CheckoutPage() {
                   <div className="flex justify-between items-center"><span className="text-gray-500">Recipient</span><span className="font-medium">{merchantName}</span></div>
                   <div className="flex justify-between items-center"><span className="text-gray-500">Network</span><ChainBadge chain={chain} /></div>
                 </div>
+
+                {/* Email for receipt */}
+                <div className="mb-5">
+                  <label htmlFor="receipt-email" className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Email for receipt <span className="font-normal text-gray-400">(optional)</span>
+                  </label>
+                  <div className="relative">
+                    <Mail size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      id="receipt-email"
+                      type="email"
+                      value={email}
+                      onChange={e => setEmail(e.target.value)}
+                      onBlur={() => setEmailTouched(true)}
+                      placeholder="you@example.com"
+                      className="w-full pl-9 pr-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  {emailTouched && email && !emailValid ? (
+                    <p className="text-xs text-red-500 mt-1">Enter a valid email address</p>
+                  ) : (
+                    <p className="text-[11px] text-gray-400 mt-1">
+                      We&apos;ll email you a receipt with the transaction details.
+                    </p>
+                  )}
+                </div>
+
                 <button
                   onClick={() => {
                     setState('payment_pending');
                     setTimeout(() => setState('payment_succeeded'), 3000);
                   }}
-                  className="w-full px-6 py-3 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700"
+                  disabled={Boolean(email) && !emailValid}
+                  className="w-full px-6 py-3 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Pay {formatUSDC(total)}
                 </button>
@@ -294,11 +327,52 @@ export default function CheckoutPage() {
                     <ExternalLink size={11} />
                   </a>
                 </div>
+                {/* Receipt delivery */}
+                {emailValid ? (
+                  <div className="mb-5 bg-green-50 border border-green-200 rounded-lg p-3 flex items-center gap-2.5 text-left">
+                    <Mail size={15} className="text-green-600 shrink-0" />
+                    <p className="text-xs text-green-800">
+                      Receipt sent to <span className="font-semibold">{email}</span>
+                    </p>
+                  </div>
+                ) : (
+                  <div className="mb-5 text-left">
+                    <label htmlFor="post-pay-email" className="block text-xs font-medium text-gray-600 mb-1.5">
+                      Want a receipt by email?
+                    </label>
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <Mail size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                        <input
+                          id="post-pay-email"
+                          type="email"
+                          value={email}
+                          onChange={e => setEmail(e.target.value)}
+                          placeholder="you@example.com"
+                          className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      <button
+                        disabled={!emailValid}
+                        className="px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                      >
+                        Send
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex justify-center gap-3">
-                  <button className="px-4 py-2 text-sm font-medium text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50">
+                  <Link
+                    href={receiptUrl}
+                    className="px-4 py-2 text-sm font-medium text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50"
+                  >
                     View receipt
-                  </button>
-                  <button className="px-4 py-2 text-sm font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">
+                  </Link>
+                  <button
+                    onClick={() => window.open(receiptUrl, '_blank')}
+                    className="px-4 py-2 text-sm font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50"
+                  >
                     Download receipt
                   </button>
                 </div>

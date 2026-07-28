@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Filter, MoreHorizontal, Copy, ExternalLink, Download, Link as LinkIcon, Bot, Wallet } from 'lucide-react';
+import { Search, Filter, MoreHorizontal, Copy, ExternalLink, Download, Link as LinkIcon, Bot, Wallet, Mail, AlertTriangle } from 'lucide-react';
 import { StatusPill } from '@/components/ui/status-pill';
 import { getStatusSummary } from '@/components/ui/status-explainer';
 import { WalletChip } from '@/components/ui/wallet-chip';
@@ -10,7 +10,7 @@ import { ChainBadge } from '@/components/ui/chain-badge';
 import { DataTable, type Column } from '@/components/ui/data-table';
 import { useToast } from '@/components/ui/toast';
 import { formatUSDC, formatRelativeTime, truncateAddress, getExplorerUrl } from '@/lib/utils';
-import { mockPayments, mockAgents } from '@/lib/mock-data';
+import { mockPayments, mockAgents, mockReceipts } from '@/lib/mock-data';
 import type { PaymentIntent, PaymentStatus } from '@/types';
 
 const tabs: { label: string; value: PaymentStatus | 'all' }[] = [
@@ -112,6 +112,33 @@ export default function PaymentsPage() {
       ),
     },
     {
+      key: 'receipt',
+      header: 'Receipt',
+      width: '90px',
+      render: (p) => {
+        if (p.status !== 'succeeded') return <span className="text-gray-300">-</span>;
+        const receipt = mockReceipts.find(r => r.payment_intent_id === p.id);
+        if (!receipt) {
+          return <span className="text-[10px] text-gray-400">Not sent</span>;
+        }
+        const failed = receipt.status === 'failed' || receipt.status === 'bounced';
+        const landed = receipt.status === 'delivered' || receipt.status === 'opened';
+        return (
+          <span
+            className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold border capitalize ${
+              failed ? 'bg-red-50 text-red-700 border-red-200'
+                : landed ? 'bg-green-50 text-green-700 border-green-200'
+                : receipt.status === 'pending' ? 'bg-amber-50 text-amber-700 border-amber-200'
+                : 'bg-blue-50 text-blue-700 border-blue-200'
+            }`}
+            title={receipt.error_message ?? `Sent to ${receipt.customer_email}`}
+          >
+            {failed ? <AlertTriangle size={9} /> : <Mail size={9} />} {receipt.status}
+          </span>
+        );
+      },
+    },
+    {
       key: 'network',
       header: 'Network',
       width: '90px',
@@ -187,12 +214,24 @@ export default function PaymentsPage() {
                 <span className="flex items-center gap-2"><Copy size={13} /> Copy payment ID</span>
               </button>
               {p.receipt_url && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(p.receipt_url!); toast('Receipt link copied'); setOpenMenu(null); }}
-                  className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                >
-                  <span className="flex items-center gap-2"><LinkIcon size={13} /> Copy receipt link</span>
-                </button>
+                <>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(p.receipt_url!); toast('Receipt link copied'); setOpenMenu(null); }}
+                    className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                  >
+                    <span className="flex items-center gap-2"><LinkIcon size={13} /> Copy receipt link</span>
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toast(p.customer_email ? `Receipt sent to ${p.customer_email}` : 'No email on file for this customer');
+                      setOpenMenu(null);
+                    }}
+                    className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                  >
+                    <span className="flex items-center gap-2"><Mail size={13} /> Resend receipt</span>
+                  </button>
+                </>
               )}
               {p.tx_hash && (
                 <>

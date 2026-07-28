@@ -2,23 +2,60 @@
 
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Copy, ExternalLink, RotateCcw, Check, Bot, Wallet } from 'lucide-react';
+import {
+  ArrowLeft, Copy, ExternalLink, RotateCcw, Check, Bot, Wallet,
+  Mail, Send, AlertTriangle, Clock, Eye,
+} from 'lucide-react';
 import { StatusPill } from '@/components/ui/status-pill';
 import { StatusExplainer } from '@/components/ui/status-explainer';
 import { WalletChip } from '@/components/ui/wallet-chip';
 import { ChainBadge } from '@/components/ui/chain-badge';
 import { Timeline } from '@/components/ui/timeline';
+import { Modal } from '@/components/ui/modal';
 import { useToast } from '@/components/ui/toast';
-import { formatUSDC, formatDate, getExplorerUrl, truncateAddress } from '@/lib/utils';
-import { mockPayments, mockTimeline, mockAgents } from '@/lib/mock-data';
+import { formatUSDC, formatDate, formatRelativeTime, getExplorerUrl, truncateAddress } from '@/lib/utils';
+import { mockPayments, mockTimeline, mockAgents, mockReceipts } from '@/lib/mock-data';
+import type { ReceiptStatus } from '@/types';
+
+const receiptStatusMeta: Record<ReceiptStatus, { label: string; icon: React.ElementType; className: string }> = {
+  sent:      { label: 'Sent',        icon: Send,          className: 'text-blue-700 bg-blue-50 border-blue-200' },
+  delivered: { label: 'Delivered',   icon: Check,         className: 'text-green-700 bg-green-50 border-green-200' },
+  opened:    { label: 'Opened',      icon: Eye,           className: 'text-green-700 bg-green-50 border-green-200' },
+  pending:   { label: 'Queued',      icon: Clock,         className: 'text-amber-700 bg-amber-50 border-amber-200' },
+  failed:    { label: 'Failed',      icon: AlertTriangle, className: 'text-red-700 bg-red-50 border-red-200' },
+  bounced:   { label: 'Bounced',     icon: AlertTriangle, className: 'text-red-700 bg-red-50 border-red-200' },
+  not_sent:  { label: 'Not sent',    icon: Mail,          className: 'text-gray-600 bg-gray-50 border-gray-200' },
+};
 
 export default function PaymentDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<'details' | 'customer'>('details');
+  const [sendReceiptOpen, setSendReceiptOpen] = useState(false);
+  const [receiptEmail, setReceiptEmail] = useState('');
+  const [sending, setSending] = useState(false);
 
   const payment = mockPayments.find(p => p.id === params.id) || mockPayments[0];
+  const receipt = mockReceipts.find(r => r.payment_intent_id === payment.id);
+  const receiptStatus: ReceiptStatus = receipt?.status ?? 'not_sent';
+  const receiptMeta = receiptStatusMeta[receiptStatus];
+  const canSendReceipt = payment.status === 'succeeded';
+  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(receiptEmail);
+
+  const openSendReceipt = () => {
+    setReceiptEmail(receipt?.customer_email ?? payment.customer_email ?? '');
+    setSendReceiptOpen(true);
+  };
+
+  const handleSendReceipt = () => {
+    setSending(true);
+    setTimeout(() => {
+      setSending(false);
+      setSendReceiptOpen(false);
+      toast(`Receipt sent to ${receiptEmail}`);
+    }, 1200);
+  };
 
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
@@ -96,10 +133,83 @@ export default function PaymentDetailPage() {
 
       {/* Two column layout */}
       <div className="flex gap-6">
-        {/* Left: Timeline */}
-        <div className="w-[35%] bg-white border border-gray-200 rounded-xl p-5 self-start sticky top-6">
-          <h3 className="text-sm font-semibold text-gray-900 mb-4">Activity</h3>
-          <Timeline events={mockTimeline} />
+        {/* Left: Receipt + Timeline */}
+        <div className="w-[35%] self-start sticky top-6 space-y-4">
+          {/* Email receipt */}
+          {canSendReceipt && (
+            <div className="bg-white border border-gray-200 rounded-xl p-5">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-gray-900">Email Receipt</h3>
+                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${receiptMeta.className}`}>
+                  <receiptMeta.icon size={10} /> {receiptMeta.label}
+                </span>
+              </div>
+
+              {receipt ? (
+                <div className="space-y-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-500">Recipient</span>
+                    <span className="text-gray-900 font-medium truncate ml-2">{receipt.customer_email}</span>
+                  </div>
+                  {receipt.sent_at && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-500">Sent</span>
+                      <span className="text-gray-700">{formatRelativeTime(receipt.sent_at)}</span>
+                    </div>
+                  )}
+                  {receipt.opened_at && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-500">Opened</span>
+                      <span className="text-gray-700">{formatRelativeTime(receipt.opened_at)}</span>
+                    </div>
+                  )}
+                  {receipt.attempts > 1 && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-500">Attempts</span>
+                      <span className="text-gray-700">{receipt.attempts}</span>
+                    </div>
+                  )}
+                  {receipt.error_message && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-2.5 mt-2 flex items-start gap-2">
+                      <AlertTriangle size={12} className="text-red-500 mt-0.5 shrink-0" />
+                      <p className="text-[11px] text-red-700">{receipt.error_message}</p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-xs text-gray-500">
+                  {payment.customer_email
+                    ? 'No receipt has been sent for this payment yet.'
+                    : 'No email on file for this customer. Add one to send a receipt.'}
+                </p>
+              )}
+
+              <div className="flex items-center gap-2 mt-4">
+                <button
+                  onClick={openSendReceipt}
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+                >
+                  <Send size={12} /> {receipt ? 'Resend' : 'Send receipt'}
+                </button>
+                {payment.receipt_url && (
+                  <a
+                    href={payment.receipt_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50"
+                  >
+                    <ExternalLink size={12} /> View
+                  </a>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Activity */}
+          <div className="bg-white border border-gray-200 rounded-xl p-5">
+            <h3 className="text-sm font-semibold text-gray-900 mb-4">Activity</h3>
+            <Timeline events={mockTimeline} />
+          </div>
         </div>
 
         {/* Right: Tabbed content */}
@@ -227,7 +337,14 @@ export default function PaymentDetailPage() {
                   <div className="flex items-center justify-between py-2">
                     <span className="text-sm text-gray-500">Receipt Link</span>
                     <div className="flex items-center gap-2">
-                      <span className="text-sm text-blue-600 font-medium">View receipt</span>
+                      <a
+                        href={payment.receipt_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-blue-600 font-medium hover:text-blue-700"
+                      >
+                        View receipt
+                      </a>
                       <button
                         onClick={() => copyToClipboard(payment.receipt_url!, 'Receipt link')}
                         className="text-gray-300 hover:text-gray-500"
@@ -280,6 +397,73 @@ export default function PaymentDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Send receipt modal */}
+      <Modal
+        open={sendReceiptOpen}
+        onClose={() => setSendReceiptOpen(false)}
+        title={receipt ? 'Resend Receipt' : 'Send Receipt'}
+        footer={
+          <div className="flex gap-3">
+            <button
+              onClick={() => setSendReceiptOpen(false)}
+              className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSendReceipt}
+              disabled={!emailValid || sending}
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+              <Send size={14} /> {sending ? 'Sending...' : 'Send receipt'}
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <div className="bg-gray-50 rounded-lg p-3 space-y-1.5">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-500">Payment</span>
+              <span className="font-mono text-xs text-gray-900">{payment.id}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-500">Amount</span>
+              <span className="font-semibold text-gray-900">{formatUSDC(payment.amount)} USDC</span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-500">Network</span>
+              <ChainBadge chain={payment.chain} />
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="send-receipt-email" className="text-sm font-medium text-gray-700">
+              Send to
+            </label>
+            <div className="relative mt-1">
+              <Mail size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                id="send-receipt-email"
+                type="email"
+                value={receiptEmail}
+                onChange={e => setReceiptEmail(e.target.value)}
+                placeholder="customer@example.com"
+                className="w-full pl-9 pr-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            {receiptEmail && !emailValid && (
+              <p className="text-xs text-red-500 mt-1">Enter a valid email address</p>
+            )}
+          </div>
+
+          {receipt && receipt.sent_at && (
+            <p className="text-xs text-gray-500">
+              Last sent {formatRelativeTime(receipt.sent_at)} &middot; {receipt.attempts} attempt{receipt.attempts === 1 ? '' : 's'}
+            </p>
+          )}
+        </div>
+      </Modal>
     </div>
   );
 }

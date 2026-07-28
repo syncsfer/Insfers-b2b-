@@ -238,6 +238,38 @@ export interface Payout {
   completed_at: string | null;
 }
 
+// Email Receipts
+
+export type ReceiptStatus = 'sent' | 'delivered' | 'opened' | 'pending' | 'failed' | 'bounced' | 'not_sent';
+
+export interface Receipt {
+  id: string;
+  payment_intent_id: string;
+  customer_email: string;
+  status: ReceiptStatus;
+  amount: number;
+  chain: Chain;
+  tx_hash: string | null;
+  receipt_url: string;
+  sent_at: string | null;
+  delivered_at: string | null;
+  opened_at: string | null;
+  attempts: number;
+  error_message: string | null;
+  created_at: string;
+}
+
+export interface ReceiptSettings {
+  auto_send: boolean;
+  from_name: string;
+  reply_to: string;
+  bcc_email: string | null;
+  subject_template: string;
+  footer_message: string;
+  include_tx_link: boolean;
+  attach_pdf: boolean;
+}
+
 export type ActionCategory = 'failed_transaction' | 'kyc_review' | 'flagged_activity' | 'dispute' | 'payout_issue' | 'overdue_invoice' | 'expiring_hold' | 'webhook_failure' | 'subscription_dunning' | 'account_review';
 export type ActionPriority = 'critical' | 'high' | 'medium' | 'low';
 

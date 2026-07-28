@@ -7,7 +7,7 @@ import { StatusPill } from '@/components/ui/status-pill';
 import { ChainBadge } from '@/components/ui/chain-badge';
 import { useToast } from '@/components/ui/toast';
 import { formatUSDC, formatDate } from '@/lib/utils';
-import { mockInvoices, mockCustomers } from '@/lib/mock-data';
+import { mockInvoices, mockCustomers, mockReceipts } from '@/lib/mock-data';
 import type { Chain } from '@/types';
 
 export default function PublicInvoicePage({ params }: { params: Promise<{ invoiceId: string }> }) {
@@ -22,6 +22,10 @@ export default function PublicInvoicePage({ params }: { params: Promise<{ invoic
 
   const isPaid = invoice.status === 'paid';
   const isVoid = invoice.status === 'void';
+  // Paid invoices link through to the receipt for the payment that settled them.
+  const receiptHref = invoice.payment_intent_id
+    ? mockReceipts.find(r => r.payment_intent_id === invoice.payment_intent_id)?.receipt_url ?? null
+    : null;
   const isOverdue = new Date(invoice.due_date) < new Date() && !isPaid && !isVoid;
   const chains: Chain[] = ['base', 'ethereum', 'polygon', 'arbitrum', 'optimism'];
 
@@ -203,9 +207,9 @@ export default function PublicInvoicePage({ params }: { params: Promise<{ invoic
           </div>
         )}
 
-        {isPaid && (
+        {isPaid && receiptHref && (
           <div className="mt-6 text-center">
-            <Link href="/" className="text-sm text-blue-600 hover:text-blue-700 font-medium">
+            <Link href={receiptHref} className="text-sm text-blue-600 hover:text-blue-700 font-medium">
               View receipt →
             </Link>
           </div>
