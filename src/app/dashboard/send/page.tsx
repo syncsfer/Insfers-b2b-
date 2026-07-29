@@ -8,13 +8,15 @@ import {
 } from 'lucide-react';
 import { StatusPill } from '@/components/ui/status-pill';
 import { ChainBadge } from '@/components/ui/chain-badge';
+import { CoinBadge, CoinMark, Money } from '@/components/ui/coin-badge';
 import { WalletChip } from '@/components/ui/wallet-chip';
 import { DataTable, type Column } from '@/components/ui/data-table';
 import { Modal } from '@/components/ui/modal';
 import { useToast } from '@/components/ui/toast';
 import { formatUSDC, formatRelativeTime, truncateAddress, getExplorerUrl } from '@/lib/utils';
 import { mockTransfers, mockSavedRecipients } from '@/lib/mock-data';
-import type { Chain, Transfer, SavedRecipient } from '@/types';
+import type { Chain, Currency, Transfer, SavedRecipient } from '@/types';
+import { STABLECOINS, STABLECOIN_LIST, getCoin, formatAmount, toUsdCents } from '@/lib/currencies';
 
 type SendStep = 'form' | 'review' | 'sending' | 'success' | 'error';
 
@@ -26,11 +28,22 @@ const supportedChains: { chain: Chain; label: string; fee: string; speed: string
   { chain: 'ethereum', label: 'Ethereum', fee: '~$2.50', speed: '~15s' },
 ];
 
-const merchantBalance = 8_542_100;
+/** Available balance per stablecoin, in each coin's minor units. */
+const balances: Record<Currency, number> = {
+  USDC: 8_542_100,
+  EURC: 3_120_400,
+  JPYC: 4_850_000,
+  HTGC: 62_400_000,
+};
 
-function estimateFee(chain: Chain, amount: number): number {
-  const fees: Record<Chain, number> = { base: 1, arbitrum: 2, optimism: 2, polygon: 1, ethereum: 250 };
-  return fees[chain] || 1;
+/**
+ * Network fee in the sending currency's minor units. The underlying gas cost is
+ * denominated in USD, so it is converted into the coin being sent.
+ */
+function estimateFee(chain: Chain, currency: Currency): number {
+  const usdCents: Record<Chain, number> = { base: 1, arbitrum: 2, optimism: 2, polygon: 1, ethereum: 250 };
+  const perUsdCent: Record<Currency, number> = { USDC: 1, EURC: 0.93, JPYC: 1.56, HTGC: 1.32 };
+  return Math.max(1, Math.round(usdCents[chain] * perUsdCent[currency]));
 }
 
 function estimateTime(chain: Chain): string {
@@ -48,6 +61,7 @@ export default function SendMoneyPage() {
   const [recipientLabel, setRecipientLabel] = useState('');
   const [amount, setAmount] = useState('');
   const [chain, setChain] = useState<Chain>('base');
+  const [currency, setCurrency] = useState<Currency>('USDC');
   const [memo, setMemo] = useState('');
   const [chainDropdownOpen, setChainDropdownOpen] = useState(false);
   const [recipientSearchOpen, setRecipientSearchOpen] = useState(false);
@@ -66,8 +80,13 @@ export default function SendMoneyPage() {
   // History state
   const [historyTab, setHistoryTab] = useState<'all' | 'completed' | 'pending' | 'failed'>('all');
 
-  const parsedAmount = Math.round(parseFloat(amount || '0') * 100);
-  const fee = estimateFee(chain, parsedAmount);
+  const coin = getCoin(currency);
+  const merchantBalance = balances[currency];
+  // Parse in the coin's own minor units — yen has no subunit.
+  const parsedAmount = Math.round(parseFloat(amount || '0') * coin.minorUnits);
+  const fee = estimateFee(chain, currency);
+  // Networks are constrained by the coin: JPYC doesn't exist on Base, etc.
+  const availableChains = supportedChains.filter(c => coin.networks.includes(c.chain));
   const total = parsedAmount + fee;
   const isValidAddress = /^0x[a-fA-F0-9]{40}$/.test(recipientAddress);
   const canProceed = isValidAddress && parsedAmount > 0 && total <= merchantBalance;
@@ -91,6 +110,14 @@ export default function SendMoneyPage() {
     pending: mockTransfers.filter(t => t.status === 'pending' || t.status === 'confirming').length,
     failed: mockTransfers.filter(t => t.status === 'failed').length,
   }), []);
+
+  const changeCurrency = (next: Currency) => {
+    setCurrency(next);
+    // Move off a network the new coin can't settle on.
+    if (!STABLECOINS[next].networks.includes(chain)) {
+      setChain(STABLECOINS[next].networks[0]);
+    }
+  };
 
   const selectRecipient = (r: SavedRecipient) => {
     setRecipientAddress(r.address);
@@ -147,11 +174,15 @@ export default function SendMoneyPage() {
     },
     {
       key: 'amount', header: 'Amount', width: '120px', align: 'right',
-      render: (t) => <span className="font-semibold text-gray-900">{formatUSDC(t.amount)}</span>,
+      render: (t) => <span className="font-semibold text-gray-900"><Money minor={t.amount} currency={t.currency} showTicker={false} /></span>,
     },
     {
       key: 'fee', header: 'Fee', width: '80px', align: 'right',
-      render: (t) => <span className="text-gray-400">{formatUSDC(t.fee)}</span>,
+      render: (t) => <span className="text-gray-400"><Money minor={t.fee} currency={t.currency} showTicker={false} /></span>,
+    },
+    {
+      key: 'currency', header: 'Currency', width: '90px',
+      render: (t) => <CoinBadge currency={t.currency} size="sm" />,
     },
     {
       key: 'chain', header: 'Network', width: '100px',
@@ -183,12 +214,14 @@ export default function SendMoneyPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Send Money</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Send USDC to any wallet across all supported chains</p>
+          <p className="text-sm text-gray-500 mt-0.5">Send stablecoins to any wallet across all supported chains</p>
         </div>
         <div className="flex items-center gap-3">
           <div className="text-right">
-            <div className="text-xs text-gray-500">Available Balance</div>
-            <div className="text-lg font-bold text-gray-900">{formatUSDC(merchantBalance)}</div>
+            <div className="text-xs text-gray-500">Available &middot; {coin.symbol}</div>
+            <div className="text-lg font-bold text-gray-900 tabular-nums">
+              {formatAmount(merchantBalance, currency)}
+            </div>
           </div>
         </div>
       </div>
@@ -218,7 +251,7 @@ export default function SendMoneyPage() {
             <div className="bg-white border border-gray-200 rounded-xl">
               <div className="px-6 py-5 border-b border-gray-100">
                 <h2 className="text-base font-semibold text-gray-900">New Transfer</h2>
-                <p className="text-sm text-gray-500 mt-0.5">Send USDC stablecoins like a wire transfer — instant, low fees, any chain.</p>
+                <p className="text-sm text-gray-500 mt-0.5">Send stablecoins like a wire transfer — instant, low fees, any chain.</p>
               </div>
 
               <div className="px-6 py-5 space-y-5">
@@ -298,25 +331,58 @@ export default function SendMoneyPage() {
                   )}
                 </div>
 
+                {/* Currency */}
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Currency</label>
+                  <div className="mt-1.5 grid grid-cols-4 gap-2">
+                    {STABLECOIN_LIST.map(c => {
+                      const active = currency === c.symbol;
+                      return (
+                        <button
+                          key={c.symbol}
+                          onClick={() => changeCurrency(c.symbol)}
+                          title={`${c.name} · ${c.fiat}`}
+                          className={`flex flex-col items-center gap-1 rounded-xl border px-2 py-2.5 transition-all ${
+                            active
+                              ? 'border-blue-500 bg-blue-50/60 ring-4 ring-blue-500/10'
+                              : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                          }`}
+                        >
+                          <CoinMark currency={c.symbol} size="lg" />
+                          <span className={`text-[11px] font-semibold ${active ? 'text-blue-700' : 'text-gray-700'}`}>
+                            {c.symbol}
+                          </span>
+                          <span className="text-[9px] leading-none text-gray-400">
+                            {formatAmount(balances[c.symbol], c.symbol)}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="mt-1.5 text-[11px] text-gray-400">
+                    {coin.name} &middot; settles on {coin.networks.length} network{coin.networks.length === 1 ? '' : 's'}
+                  </p>
+                </div>
+
                 {/* Amount */}
                 <div>
-                  <label className="text-sm font-medium text-gray-700">Amount (USDC)</label>
+                  <label className="text-sm font-medium text-gray-700">Amount ({coin.symbol})</label>
                   <div className="relative mt-1.5">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-medium">$</span>
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-medium">{coin.sign}</span>
                     <input
                       type="number"
                       value={amount}
                       onChange={e => setAmount(e.target.value)}
                       placeholder="0.00"
                       min="0"
-                      step="0.01"
+                      step={coin.precision === 0 ? '1' : '0.01'}
                       className="w-full pl-7 pr-16 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-gray-400">USDC</span>
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-gray-400">{coin.symbol}</span>
                   </div>
                   {parsedAmount > 0 && total > merchantBalance && (
                     <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
-                      <AlertTriangle size={12} /> Insufficient balance. Available: {formatUSDC(merchantBalance)}
+                      <AlertTriangle size={12} /> Insufficient {coin.symbol}. Available: {formatAmount(merchantBalance, currency)}
                     </p>
                   )}
                 </div>
@@ -332,7 +398,7 @@ export default function SendMoneyPage() {
                       <div className="flex items-center gap-3">
                         <ChainBadge chain={chain} />
                         <span className="text-gray-500">
-                          Fee: {supportedChains.find(c => c.chain === chain)?.fee} &middot; Speed: {supportedChains.find(c => c.chain === chain)?.speed}
+                          Fee: {formatAmount(fee, currency)} &middot; Speed: {supportedChains.find(c => c.chain === chain)?.speed}
                         </span>
                       </div>
                       <ChevronDown size={16} className="text-gray-400" />
@@ -340,7 +406,7 @@ export default function SendMoneyPage() {
 
                     {chainDropdownOpen && (
                       <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg py-1">
-                        {supportedChains.map(c => (
+                        {availableChains.map(c => (
                           <button
                             key={c.chain}
                             onClick={() => { setChain(c.chain); setChainDropdownOpen(false); }}
@@ -391,15 +457,15 @@ export default function SendMoneyPage() {
                   <div className="bg-gray-50 rounded-lg p-4 space-y-2">
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-500">Send amount</span>
-                      <span className="font-medium text-gray-900">{formatUSDC(parsedAmount)} USDC</span>
+                      <span className="font-medium text-gray-900">{formatAmount(parsedAmount, currency)} {coin.symbol}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-500">Network fee</span>
-                      <span className="text-gray-600">{formatUSDC(fee)}</span>
+                      <span className="text-gray-600">{formatAmount(fee, currency)}</span>
                     </div>
                     <div className="border-t border-gray-200 pt-2 flex justify-between text-sm">
                       <span className="font-medium text-gray-700">Total debit</span>
-                      <span className="font-bold text-gray-900">{formatUSDC(total)}</span>
+                      <span className="font-bold text-gray-900">{formatAmount(total, currency)}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-500">Estimated time</span>
@@ -445,10 +511,11 @@ export default function SendMoneyPage() {
                         <div className="font-mono text-sm text-gray-700">{recipientAddress}</div>
                       </div>
                     )},
+                    { label: 'Currency', value: <CoinBadge currency={currency} showName /> },
                     { label: 'Network', value: <ChainBadge chain={chain} /> },
-                    { label: 'Amount', value: <span className="text-lg font-bold text-gray-900">{formatUSDC(parsedAmount)} USDC</span> },
-                    { label: 'Network Fee', value: <span className="text-sm text-gray-600">{formatUSDC(fee)}</span> },
-                    { label: 'Total Debit', value: <span className="text-sm font-bold text-gray-900">{formatUSDC(total)}</span> },
+                    { label: 'Amount', value: <span className="text-lg font-bold text-gray-900">{formatAmount(parsedAmount, currency)} {coin.symbol}</span> },
+                    { label: 'Network Fee', value: <span className="text-sm text-gray-600">{formatAmount(fee, currency)}</span> },
+                    { label: 'Total Debit', value: <span className="text-sm font-bold text-gray-900">{formatAmount(total, currency)}</span> },
                     { label: 'Est. Arrival', value: <span className="text-sm text-gray-600">{estimateTime(chain)}</span> },
                     ...(memo ? [{ label: 'Memo', value: <span className="text-sm text-gray-600">{memo}</span> }] : []),
                   ].map((row, i) => (
@@ -461,7 +528,7 @@ export default function SendMoneyPage() {
 
                 <div className="bg-gray-50 rounded-lg p-3 flex items-center justify-between">
                   <span className="text-sm text-gray-500">Remaining balance after transfer</span>
-                  <span className="text-sm font-semibold text-gray-900">{formatUSDC(merchantBalance - total)}</span>
+                  <span className="text-sm font-semibold text-gray-900">{formatAmount(merchantBalance - total, currency)}</span>
                 </div>
               </div>
 
@@ -476,7 +543,7 @@ export default function SendMoneyPage() {
                   onClick={handleSend}
                   className="inline-flex items-center gap-2 px-6 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
                 >
-                  <Send size={15} /> Confirm & Send {formatUSDC(parsedAmount)}
+                  <Send size={15} /> Confirm & Send {formatAmount(parsedAmount, currency)} {coin.symbol}
                 </button>
               </div>
             </div>
@@ -487,7 +554,7 @@ export default function SendMoneyPage() {
               <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center mx-auto mb-4 animate-pulse">
                 <Loader2 size={28} className="text-blue-600 animate-spin" />
               </div>
-              <h2 className="text-lg font-semibold text-gray-900 mb-1">Sending {formatUSDC(parsedAmount)} USDC</h2>
+              <h2 className="text-lg font-semibold text-gray-900 mb-1">Sending {formatAmount(parsedAmount, currency)} {coin.symbol}</h2>
               <p className="text-sm text-gray-500">Broadcasting transaction to {chain}...</p>
               <div className="mt-6 flex items-center justify-center gap-6 text-xs text-gray-400">
                 <span>Signing transaction</span>
@@ -506,7 +573,7 @@ export default function SendMoneyPage() {
               </div>
               <h2 className="text-lg font-semibold text-gray-900 mb-1">Transfer Sent Successfully</h2>
               <p className="text-sm text-gray-500 mb-6">
-                {formatUSDC(parsedAmount)} USDC sent to {recipientLabel || truncateAddress(recipientAddress)} on {chain}
+                {formatAmount(parsedAmount, currency)} {coin.symbol} sent to {recipientLabel || truncateAddress(recipientAddress)} on {chain}
               </p>
 
               <div className="bg-gray-50 rounded-lg p-4 max-w-md mx-auto space-y-3 text-left">
@@ -532,12 +599,16 @@ export default function SendMoneyPage() {
                   </div>
                 </div>
                 <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-500">Currency</span>
+                  <CoinBadge currency={currency} size="sm" />
+                </div>
+                <div className="flex items-center justify-between">
                   <span className="text-xs text-gray-500">Network</span>
                   <ChainBadge chain={chain} />
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-gray-500">Amount</span>
-                  <span className="text-sm font-semibold text-gray-900">{formatUSDC(parsedAmount)} USDC</span>
+                  <span className="text-sm font-semibold text-gray-900">{formatAmount(parsedAmount, currency)} {coin.symbol}</span>
                 </div>
               </div>
 
@@ -568,14 +639,17 @@ export default function SendMoneyPage() {
           {/* Summary cards */}
           <div className="grid grid-cols-4 gap-4 mb-6">
             {[
-              { label: 'Total Sent (30d)', value: formatUSDC(mockTransfers.filter(t => t.status === 'completed').reduce((sum, t) => sum + t.amount, 0)), color: 'text-gray-900' },
+              { label: 'Total Sent (30d)', value: `≈ ${formatUSDC(mockTransfers.filter(t => t.status === 'completed').reduce((sum, t) => sum + toUsdCents(t.amount, t.currency), 0))}`, color: 'text-gray-900', note: 'USD equivalent across all currencies' },
               { label: 'Transfers (30d)', value: mockTransfers.length.toString(), color: 'text-gray-900' },
-              { label: 'Avg. Transfer', value: formatUSDC(Math.round(mockTransfers.reduce((sum, t) => sum + t.amount, 0) / mockTransfers.length)), color: 'text-gray-900' },
-              { label: 'Total Fees (30d)', value: formatUSDC(mockTransfers.filter(t => t.status === 'completed').reduce((sum, t) => sum + t.fee, 0)), color: 'text-gray-500' },
+              { label: 'Avg. Transfer', value: `≈ ${formatUSDC(Math.round(mockTransfers.reduce((sum, t) => sum + toUsdCents(t.amount, t.currency), 0) / mockTransfers.length))}`, color: 'text-gray-900', note: 'USD equivalent' },
+              { label: 'Total Fees (30d)', value: `≈ ${formatUSDC(mockTransfers.filter(t => t.status === 'completed').reduce((sum, t) => sum + toUsdCents(t.fee, t.currency), 0))}`, color: 'text-gray-500', note: 'USD equivalent' },
             ].map((stat, i) => (
               <div key={i} className="bg-white border border-gray-200 rounded-xl p-4">
                 <div className="text-xs text-gray-500 mb-1">{stat.label}</div>
                 <div className={`text-xl font-bold ${stat.color}`}>{stat.value}</div>
+                {'note' in stat && stat.note && (
+                  <div className="text-[10px] text-gray-400 mt-0.5">{stat.note}</div>
+                )}
               </div>
             ))}
           </div>
@@ -644,7 +718,7 @@ export default function SendMoneyPage() {
                   <div className="font-mono text-xs text-gray-400 mt-0.5">{r.address}</div>
                 </div>
                 <div className="text-right shrink-0">
-                  <div className="text-sm font-semibold text-gray-900">{formatUSDC(r.total_sent)}</div>
+                  <div className="text-sm font-semibold text-gray-900">≈ {formatUSDC(r.total_sent)}</div>
                   <div className="text-xs text-gray-400">{r.transfer_count} transfers</div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">

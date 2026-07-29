@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { Plus, Send, Eye, MoreHorizontal, Copy, ExternalLink, CheckCircle2, Bot, Wallet } from 'lucide-react';
 import { StatusPill } from '@/components/ui/status-pill';
+import { CoinBadge, Money } from '@/components/ui/coin-badge';
 import { getStatusSummary } from '@/components/ui/status-explainer';
 import { DataTable, type Column } from '@/components/ui/data-table';
 import { Modal } from '@/components/ui/modal';
@@ -74,7 +75,8 @@ export default function InvoicesPage() {
         <div className="text-[10px] text-gray-400 mt-0.5 leading-tight">{getStatusSummary('invoice', inv.status)}</div>
       </div>
     ) },
-    { key: 'amount', header: 'Amount', width: '100px', align: 'right', render: (inv) => <span className="font-semibold text-gray-900">{formatUSDC(inv.amount)}</span> },
+    { key: 'amount', header: 'Amount', width: '120px', align: 'right', render: (inv) => <span className="font-semibold text-gray-900"><Money minor={inv.amount} currency={inv.currency} showTicker={false} /></span> },
+    { key: 'currency', header: 'Currency', width: '90px', render: (inv) => <CoinBadge currency={inv.currency} size="sm" /> },
     {
       key: 'due', header: 'Due Date', width: '120px',
       render: (inv) => {

@@ -10,10 +10,12 @@ import { StatusPill } from '@/components/ui/status-pill';
 import { StatusExplainer } from '@/components/ui/status-explainer';
 import { WalletChip } from '@/components/ui/wallet-chip';
 import { ChainBadge } from '@/components/ui/chain-badge';
+import { CoinBadge, Money } from '@/components/ui/coin-badge';
 import { Timeline } from '@/components/ui/timeline';
 import { Modal } from '@/components/ui/modal';
 import { useToast } from '@/components/ui/toast';
-import { formatUSDC, formatDate, formatRelativeTime, getExplorerUrl, truncateAddress } from '@/lib/utils';
+import { formatDate, formatRelativeTime, getExplorerUrl, truncateAddress } from '@/lib/utils';
+import { formatAmount } from '@/lib/currencies';
 import { mockPayments, mockTimeline, mockAgents, mockReceipts } from '@/lib/mock-data';
 import type { ReceiptStatus } from '@/types';
 
@@ -84,7 +86,10 @@ export default function PaymentDetailPage() {
             <span className="text-base font-semibold text-gray-600">{payment.id}</span>
             <StatusPill status={payment.status} size="lg" />
           </div>
-          <div className="text-3xl font-bold text-gray-900">{formatUSDC(payment.amount)}</div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-3xl font-bold text-gray-900">{formatAmount(payment.amount, payment.currency)}</span>
+            <CoinBadge currency={payment.currency} size="lg" showName />
+          </div>
           {payment.status === 'succeeded' && (
             <div className="flex items-center gap-1.5 mt-2">
               <Check size={14} className="text-green-600" />
@@ -236,10 +241,11 @@ export default function PaymentDetailPage() {
               <div className="space-y-4">
                 {[
                   { label: 'Payment ID', value: payment.id, copy: true },
-                  { label: 'Amount', value: `${formatUSDC(payment.amount)} USDC` },
-                  { label: 'Fee', value: formatUSDC(payment.fee), tooltip: 'Network gas fee' },
-                  { label: 'Net Amount', value: formatUSDC(payment.net_amount) },
+                  { label: 'Amount', value: <Money minor={payment.amount} currency={payment.currency} size="lg" /> },
+                  { label: 'Fee', value: <Money minor={payment.fee} currency={payment.currency} />, tooltip: 'Network gas fee' },
+                  { label: 'Net Amount', value: <Money minor={payment.net_amount} currency={payment.currency} /> },
                   { label: 'Status', value: <StatusPill status={payment.status} /> },
+                  { label: 'Currency', value: <CoinBadge currency={payment.currency} showName /> },
                   { label: 'Network', value: <ChainBadge chain={payment.chain} /> },
                 ].map((row, i) => (
                   <div key={i} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
@@ -429,7 +435,7 @@ export default function PaymentDetailPage() {
             </div>
             <div className="flex items-center justify-between text-sm">
               <span className="text-gray-500">Amount</span>
-              <span className="font-semibold text-gray-900">{formatUSDC(payment.amount)} USDC</span>
+              <span className="font-semibold text-gray-900"><Money minor={payment.amount} currency={payment.currency} /></span>
             </div>
             <div className="flex items-center justify-between text-sm">
               <span className="text-gray-500">Network</span>

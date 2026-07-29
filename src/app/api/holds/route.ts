@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateId } from '@/lib/utils';
-import type { Hold, HoldStatus } from '@/types';
+import type { Currency, Hold, HoldStatus } from '@/types';
 
 const VALID_STATUSES: HoldStatus[] = ['active', 'captured', 'released', 'expired'];
 
@@ -24,12 +24,14 @@ const mockHolds: Hold[] = Array.from({ length: 12 }, (_, i) => {
   const statuses: HoldStatus[] = ['active', 'active', 'captured', 'released', 'expired'];
   const status = statuses[Math.floor(Math.random() * statuses.length)];
   const amount = Math.floor(Math.random() * 50000) + 500;
+  const currency: Currency = 'USDC';
   const created = randomDate(14);
   const expiresAt = new Date(new Date(created).getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
   return {
     id: `hold_${String(i + 1).padStart(3, '0')}${Math.random().toString(36).slice(2, 8)}`,
     amount,
+    currency,
     captured_amount: status === 'captured' ? amount : 0,
     released_amount: status === 'released' ? amount : 0,
     status,
@@ -127,6 +129,7 @@ export async function POST(request: NextRequest) {
   const hold: Hold = {
     id,
     amount,
+    currency: 'USDC',
     captured_amount: 0,
     released_amount: 0,
     status: 'active',

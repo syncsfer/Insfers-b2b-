@@ -4,6 +4,11 @@ export function cn(...inputs: ClassValue[]) {
   return clsx(inputs);
 }
 
+/**
+ * Formats a USD-denominated amount. Kept for call sites that are inherently
+ * dollar-based (fees, USD-equivalent totals). For anything that carries a
+ * currency, use `formatAmount` from `@/lib/currencies` instead.
+ */
 export function formatUSDC(cents: number): string {
   return `$${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }

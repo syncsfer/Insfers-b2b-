@@ -3,10 +3,46 @@ import type {
   WebhookEndpoint, ApiKey, WebhookLog, TimelineEvent, DashboardKPIs,
   Chain, Hold, Subscription, Plan, ConnectedAccount, Payout,
   ActionItem, AIAgent, AgentAction, Transfer, SavedRecipient,
-  Receipt, ReceiptSettings,
+  Receipt, ReceiptSettings, Currency,
 } from '@/types';
+import { STABLECOINS } from '@/lib/currencies';
 
 const chains: Chain[] = ['base', 'ethereum', 'polygon', 'arbitrum', 'optimism'];
+
+// Multi-currency helpers. USDC still dominates volume; the others are weighted
+// to appear often enough that every surface gets exercised.
+const currencyWeights: Currency[] = [
+  'USDC', 'USDC', 'USDC', 'USDC', 'USDC',
+  'EURC', 'EURC', 'EURC',
+  'JPYC', 'JPYC',
+  'HTGC', 'HTGC',
+];
+
+function pickCurrency(): Currency {
+  return currencyWeights[Math.floor(Math.random() * currencyWeights.length)];
+}
+
+/** Only return a chain the coin actually settles on. */
+function chainFor(currency: Currency): Chain {
+  const nets = STABLECOINS[currency].networks;
+  return nets[Math.floor(Math.random() * nets.length)];
+}
+
+/**
+ * A plausible transaction size in the currency's minor units. Yen has no
+ * subunit, so its numbers are ~100x smaller than a naive cents conversion,
+ * and the gourde is a low-value currency so amounts run large.
+ */
+function amountFor(currency: Currency, scale = 1): number {
+  const ranges: Record<Currency, [number, number]> = {
+    USDC: [500, 250_000],
+    EURC: [500, 220_000],
+    JPYC: [800, 400_000],
+    HTGC: [10_000, 3_000_000],
+  };
+  const [min, max] = ranges[currency];
+  return Math.floor((Math.random() * (max - min) + min) * scale);
+}
 const addresses = [
   '0x1a2b3c4d5e6f7890abcdef1234567890abcdef12',
   '0x9876543210fedcba9876543210fedcba98765432',
@@ -31,11 +67,12 @@ function randomDate(daysBack: number): string {
 }
 
 export const mockPayments: PaymentIntent[] = Array.from({ length: 50 }, (_, i) => {
-  const amount = Math.floor(Math.random() * 100000) + 100;
-  const fee = Math.floor(amount * 0.001);
+  const currency = pickCurrency();
+  const amount = amountFor(currency);
+  const fee = Math.max(1, Math.floor(amount * 0.001));
   const statuses: PaymentIntent['status'][] = ['succeeded', 'succeeded', 'succeeded', 'pending', 'failed', 'expired', 'awaiting_payment'];
   const status = statuses[Math.floor(Math.random() * statuses.length)];
-  const chain = chains[Math.floor(Math.random() * chains.length)];
+  const chain = chainFor(currency);
   const created = randomDate(30);
   const isAgent = Math.random() > 0.75;
   const id = `pi_${String(i + 1).padStart(3, '0')}${Math.random().toString(36).slice(2, 10)}`;
@@ -45,6 +82,7 @@ export const mockPayments: PaymentIntent[] = Array.from({ length: 50 }, (_, i) =
     amount,
     status,
     chain,
+    currency,
     from_address: addresses[Math.floor(Math.random() * addresses.length)],
     to_address: merchantAddress,
     tx_hash: status !== 'awaiting_payment' ? `0x${Math.random().toString(16).slice(2)}${Math.random().toString(16).slice(2)}` : null,
@@ -117,7 +155,8 @@ export const mockPaymentLinks: PaymentLink[] = Array.from({ length: 8 }, (_, i) 
 export const mockInvoices: Invoice[] = Array.from({ length: 12 }, (_, i) => {
   const statuses: Invoice['status'][] = ['paid', 'sent', 'draft', 'overdue', 'void'];
   const status = statuses[Math.floor(Math.random() * statuses.length)];
-  const amount = Math.floor(Math.random() * 100000) + 1000;
+  const currency = pickCurrency();
+  const amount = amountFor(currency);
   const createdByAgent = Math.random() > 0.7;
   const paidByAgent = status === 'paid' && Math.random() > 0.6;
   return {
@@ -125,6 +164,7 @@ export const mockInvoices: Invoice[] = Array.from({ length: 12 }, (_, i) => {
     customer_id: `cus_${String((i % 10) + 1).padStart(3, '0')}`,
     customer_email: `user${(i % 10) + 1}@example.com`,
     amount,
+    currency,
     status,
     due_date: new Date(Date.now() + (Math.random() > 0.5 ? 1 : -1) * Math.floor(Math.random() * 30) * 86400000).toISOString(),
     paid_at: status === 'paid' ? randomDate(7) : null,
@@ -216,7 +256,8 @@ export const mockDashboardKPIs: DashboardKPIs = {
 };
 
 export const mockHolds: Hold[] = Array.from({ length: 12 }, (_, i) => {
-  const amount = Math.floor(Math.random() * 50000) + 1000;
+  const currency = pickCurrency();
+  const amount = amountFor(currency);
   const statuses: Hold['status'][] = ['active', 'active', 'captured', 'released', 'expired'];
   const status = statuses[Math.floor(Math.random() * statuses.length)];
   const capturedAmount = status === 'captured' ? amount : status === 'released' ? 0 : 0;
@@ -224,6 +265,7 @@ export const mockHolds: Hold[] = Array.from({ length: 12 }, (_, i) => {
   return {
     id: `hold_${String(i + 1).padStart(3, '0')}`,
     amount,
+    currency,
     captured_amount: capturedAmount,
     released_amount: releasedAmount,
     status,
@@ -403,11 +445,12 @@ export const mockSavedRecipients: SavedRecipient[] = [
 ];
 
 export const mockTransfers: Transfer[] = Array.from({ length: 20 }, (_, i) => {
-  const amount = Math.floor(Math.random() * 200000) + 5000;
-  const fee = Math.floor(amount * 0.001);
+  const currency = pickCurrency();
+  const amount = amountFor(currency);
+  const fee = Math.max(1, Math.floor(amount * 0.001));
   const statuses: Transfer['status'][] = ['completed', 'completed', 'completed', 'completed', 'pending', 'confirming', 'failed'];
   const status = statuses[Math.floor(Math.random() * statuses.length)] as Transfer['status'];
-  const chain = chains[Math.floor(Math.random() * chains.length)];
+  const chain = chainFor(currency);
   const created = randomDate(30);
   const recipient = mockSavedRecipients[Math.floor(Math.random() * mockSavedRecipients.length)];
 
@@ -419,6 +462,7 @@ export const mockTransfers: Transfer[] = Array.from({ length: 20 }, (_, i) => {
     fee,
     net_amount: amount + fee,
     chain,
+    currency,
     status,
     tx_hash: ['completed', 'confirming'].includes(status) ? `0x${Math.random().toString(16).slice(2)}${Math.random().toString(16).slice(2)}` : null,
     memo: ['Vendor payment', 'Monthly retainer', 'Invoice settlement', 'Payroll', null, null][Math.floor(Math.random() * 6)],
@@ -461,6 +505,7 @@ export const mockReceipts: Receipt[] = mockPayments
       status,
       amount: p.amount,
       chain: p.chain,
+      currency: p.currency,
       tx_hash: p.tx_hash,
       receipt_url: `/r/${id}`,
       sent_at: sentAt,

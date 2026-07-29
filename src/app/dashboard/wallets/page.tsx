@@ -7,25 +7,43 @@ import {
   AlertTriangle, RefreshCw, QrCode,
 } from 'lucide-react';
 import { ChainBadge } from '@/components/ui/chain-badge';
+import { CoinBadge, CoinMark } from '@/components/ui/coin-badge';
 import { WalletChip } from '@/components/ui/wallet-chip';
 import { StatusPill } from '@/components/ui/status-pill';
 import { Modal } from '@/components/ui/modal';
 import { useToast } from '@/components/ui/toast';
 import { formatUSDC, truncateAddress, getExplorerAddressUrl } from '@/lib/utils';
-import type { Chain } from '@/types';
+import type { Chain, Currency } from '@/types';
+import { STABLECOIN_LIST, getCoin, formatAmount, toUsdCents } from '@/lib/currencies';
+
+type CoinAmounts = Partial<Record<Currency, number>>;
 
 interface WalletAccount {
   id: string;
   label: string;
   address: string;
   chain: Chain;
-  balance: number;
-  pending_in: number;
-  pending_out: number;
+  /** Balance per stablecoin, in each coin's minor units. */
+  balances: CoinAmounts;
+  pending_in: CoinAmounts;
+  pending_out: CoinAmounts;
   is_settlement: boolean;
   is_primary: boolean;
   status: 'active' | 'inactive';
   created_at: string;
+}
+
+/** Sum a wallet's holdings as approximate USD cents, for cross-coin totals. */
+function usdTotal(amounts: CoinAmounts): number {
+  return Object.entries(amounts).reduce(
+    (sum, [sym, amt]) => sum + toUsdCents(amt ?? 0, sym as Currency), 0);
+}
+
+/** Coins held in a wallet, ordered by the registry so colours stay consistent. */
+function heldCoins(w: WalletAccount): Currency[] {
+  return STABLECOIN_LIST
+    .map(c => c.symbol)
+    .filter(sym => (w.balances[sym] ?? 0) > 0) as Currency[];
 }
 
 interface NetworkConfig {
@@ -36,11 +54,44 @@ interface NetworkConfig {
 }
 
 const mockWallets: WalletAccount[] = [
-  { id: 'w_001', label: 'Primary Treasury', address: '0x7777777777777777777777777777777777777777', chain: 'base', balance: 8_542_100, pending_in: 234_500, pending_out: 120_000, is_settlement: true, is_primary: true, status: 'active', created_at: '2025-06-15T10:00:00Z' },
-  { id: 'w_002', label: 'Ethereum Settlement', address: '0x7777777777777777777777777777777777777777', chain: 'ethereum', balance: 2_156_300, pending_in: 89_000, pending_out: 0, is_settlement: true, is_primary: false, status: 'active', created_at: '2025-07-01T10:00:00Z' },
-  { id: 'w_003', label: 'Polygon Settlement', address: '0x7777777777777777777777777777777777777777', chain: 'polygon', balance: 1_023_400, pending_in: 45_200, pending_out: 50_000, is_settlement: true, is_primary: false, status: 'active', created_at: '2025-07-15T10:00:00Z' },
-  { id: 'w_004', label: 'Arbitrum Wallet', address: '0x8888888888888888888888888888888888888888', chain: 'arbitrum', balance: 456_700, pending_in: 0, pending_out: 0, is_settlement: false, is_primary: false, status: 'active', created_at: '2025-09-01T10:00:00Z' },
-  { id: 'w_005', label: 'Optimism Reserve', address: '0x9999999999999999999999999999999999999999', chain: 'optimism', balance: 312_500, pending_in: 12_300, pending_out: 0, is_settlement: false, is_primary: false, status: 'inactive', created_at: '2025-10-01T10:00:00Z' },
+  {
+    id: 'w_001', label: 'Primary Treasury', address: '0x7777777777777777777777777777777777777777',
+    chain: 'base',
+    balances: { USDC: 8_542_100, EURC: 2_310_400, HTGC: 41_250_000 },
+    pending_in: { USDC: 234_500, EURC: 61_200 },
+    pending_out: { USDC: 120_000 },
+    is_settlement: true, is_primary: true, status: 'active', created_at: '2025-06-15T10:00:00Z',
+  },
+  {
+    id: 'w_002', label: 'Ethereum Settlement', address: '0x7777777777777777777777777777777777777777',
+    chain: 'ethereum',
+    balances: { USDC: 2_156_300, EURC: 810_000, JPYC: 3_120_000 },
+    pending_in: { USDC: 89_000, JPYC: 145_000 },
+    pending_out: {},
+    is_settlement: true, is_primary: false, status: 'active', created_at: '2025-07-01T10:00:00Z',
+  },
+  {
+    id: 'w_003', label: 'Polygon Settlement', address: '0x7777777777777777777777777777777777777777',
+    chain: 'polygon',
+    balances: { USDC: 1_023_400, JPYC: 1_730_000, HTGC: 21_150_000 },
+    pending_in: { HTGC: 1_240_000 },
+    pending_out: { USDC: 50_000 },
+    is_settlement: true, is_primary: false, status: 'active', created_at: '2025-07-15T10:00:00Z',
+  },
+  {
+    id: 'w_004', label: 'Arbitrum Wallet', address: '0x8888888888888888888888888888888888888888',
+    chain: 'arbitrum',
+    balances: { USDC: 456_700 },
+    pending_in: {}, pending_out: {},
+    is_settlement: false, is_primary: false, status: 'active', created_at: '2025-09-01T10:00:00Z',
+  },
+  {
+    id: 'w_005', label: 'Optimism Reserve', address: '0x9999999999999999999999999999999999999999',
+    chain: 'optimism',
+    balances: { USDC: 312_500 },
+    pending_in: { USDC: 12_300 }, pending_out: {},
+    is_settlement: false, is_primary: false, status: 'inactive', created_at: '2025-10-01T10:00:00Z',
+  },
 ];
 
 const mockNetworkConfigs: NetworkConfig[] = [
@@ -79,13 +130,21 @@ export default function WalletsPage() {
   const [withdrawAddress, setWithdrawAddress] = useState('');
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [withdrawChain, setWithdrawChain] = useState<Chain>('base');
+  const [withdrawCurrency, setWithdrawCurrency] = useState<Currency>('USDC');
 
   // Network configs
   const [networkConfigs, setNetworkConfigs] = useState(mockNetworkConfigs);
 
-  const totalBalance = mockWallets.reduce((sum, w) => sum + w.balance, 0);
-  const totalPendingIn = mockWallets.reduce((sum, w) => sum + w.pending_in, 0);
-  const totalPendingOut = mockWallets.reduce((sum, w) => sum + w.pending_out, 0);
+  // Cross-coin totals are USD-equivalent; per-coin totals are exact.
+  const totalBalance = mockWallets.reduce((sum, w) => sum + usdTotal(w.balances), 0);
+  const totalPendingIn = mockWallets.reduce((sum, w) => sum + usdTotal(w.pending_in), 0);
+  const totalPendingOut = mockWallets.reduce((sum, w) => sum + usdTotal(w.pending_out), 0);
+
+  /** Exact holdings per coin, summed across every wallet. */
+  const byCurrency = STABLECOIN_LIST.map(c => ({
+    coin: c,
+    amount: mockWallets.reduce((sum, w) => sum + (w.balances[c.symbol] ?? 0), 0),
+  })).filter(r => r.amount > 0);
   const settlementWallets = mockWallets.filter(w => w.is_settlement);
   const activeWallets = mockWallets.filter(w => w.status === 'active');
 
@@ -135,9 +194,11 @@ export default function WalletsPage() {
             <Wallet size={14} className="text-gray-400" />
           </div>
           <div className="text-2xl font-bold text-gray-900">
-            {showBalances ? formatUSDC(totalBalance) : '******'}
+            {showBalances ? `≈ ${formatUSDC(totalBalance)}` : '******'}
           </div>
-          <div className="text-xs text-gray-400 mt-1">Across {activeWallets.length} active wallets</div>
+          <div className="text-xs text-gray-400 mt-1">
+            USD equivalent · {activeWallets.length} active wallets
+          </div>
         </div>
         <div className="bg-white border border-gray-200 rounded-xl p-4">
           <div className="flex items-center justify-between mb-2">
@@ -145,7 +206,7 @@ export default function WalletsPage() {
             <TrendingUp size={14} className="text-green-500" />
           </div>
           <div className="text-2xl font-bold text-green-700">
-            {showBalances ? `+${formatUSDC(totalPendingIn)}` : '******'}
+            {showBalances ? `≈ +${formatUSDC(totalPendingIn)}` : '******'}
           </div>
           <div className="text-xs text-gray-400 mt-1">Awaiting confirmation</div>
         </div>
@@ -155,7 +216,7 @@ export default function WalletsPage() {
             <TrendingDown size={14} className="text-orange-500" />
           </div>
           <div className="text-2xl font-bold text-orange-600">
-            {showBalances ? `-${formatUSDC(totalPendingOut)}` : '******'}
+            {showBalances ? `≈ -${formatUSDC(totalPendingOut)}` : '******'}
           </div>
           <div className="text-xs text-gray-400 mt-1">Processing withdrawals</div>
         </div>
@@ -191,9 +252,39 @@ export default function WalletsPage() {
         <div className="grid grid-cols-3 gap-6">
           {/* Wallets breakdown */}
           <div className="col-span-2 space-y-3">
+            {/* Exact holdings per coin — the number that actually matters */}
+            <h3 className="text-sm font-semibold text-gray-900 mb-3">Balance by Currency</h3>
+            <div className="grid grid-cols-2 gap-3 mb-6">
+              {byCurrency.map(({ coin, amount }) => {
+                const share = totalBalance > 0 ? (toUsdCents(amount, coin.symbol) / totalBalance) * 100 : 0;
+                return (
+                  <div key={coin.symbol} className="bg-white border border-gray-200 rounded-xl p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <CoinBadge currency={coin.symbol} />
+                      <span className="text-[10px] text-gray-400">{share.toFixed(0)}% of treasury</span>
+                    </div>
+                    <div className="text-xl font-bold text-gray-900 tabular-nums">
+                      {showBalances ? formatAmount(amount, coin.symbol) : '******'}
+                    </div>
+                    <div className="text-[11px] text-gray-400 mt-0.5">{coin.name}</div>
+                    <div className="w-full bg-gray-100 rounded-full h-1 mt-2.5">
+                      <div
+                        className="h-1 rounded-full transition-all"
+                        style={{ width: `${share}%`, backgroundColor: coin.accent }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
             <h3 className="text-sm font-semibold text-gray-900 mb-3">Balance by Network</h3>
             {mockWallets.filter(w => w.status === 'active').map(w => {
-              const pct = totalBalance > 0 ? (w.balance / totalBalance) * 100 : 0;
+              const walletUsd = usdTotal(w.balances);
+              const pct = totalBalance > 0 ? (walletUsd / totalBalance) * 100 : 0;
+              const coins = heldCoins(w);
+              const pendingInUsd = usdTotal(w.pending_in);
+              const pendingOutUsd = usdTotal(w.pending_out);
               return (
                 <div key={w.id} className="bg-white border border-gray-200 rounded-xl p-4">
                   <div className="flex items-center justify-between mb-2">
@@ -211,7 +302,7 @@ export default function WalletsPage() {
                     </div>
                     <div className="text-right">
                       <div className="text-sm font-bold text-gray-900">
-                        {showBalances ? formatUSDC(w.balance) : '****'}
+                        {showBalances ? `≈ ${formatUSDC(walletUsd)}` : '****'}
                       </div>
                       <div className="text-[10px] text-gray-400">{pct.toFixed(1)}% of total</div>
                     </div>
@@ -219,15 +310,26 @@ export default function WalletsPage() {
                   <div className="w-full bg-gray-100 rounded-full h-1.5 mb-2">
                     <div className="bg-blue-500 h-1.5 rounded-full transition-all" style={{ width: `${pct}%` }} />
                   </div>
+                  <div className="flex flex-wrap items-center gap-1.5 mb-2">
+                    {coins.map(sym => (
+                      <span
+                        key={sym}
+                        className="inline-flex items-center gap-1 rounded-md bg-gray-50 border border-gray-200 px-1.5 py-0.5 text-[10px] font-medium text-gray-600"
+                      >
+                        <CoinMark currency={sym} size="sm" />
+                        {showBalances ? formatAmount(w.balances[sym] ?? 0, sym) : '****'}
+                      </span>
+                    ))}
+                  </div>
                   <div className="flex items-center justify-between text-xs text-gray-400">
                     <div className="flex items-center gap-4">
-                      {w.pending_in > 0 && (
-                        <span className="text-green-600">+{formatUSDC(w.pending_in)} pending</span>
+                      {pendingInUsd > 0 && (
+                        <span className="text-green-600">≈ +{formatUSDC(pendingInUsd)} pending</span>
                       )}
-                      {w.pending_out > 0 && (
-                        <span className="text-orange-500">-{formatUSDC(w.pending_out)} outgoing</span>
+                      {pendingOutUsd > 0 && (
+                        <span className="text-orange-500">≈ -{formatUSDC(pendingOutUsd)} outgoing</span>
                       )}
-                      {w.pending_in === 0 && w.pending_out === 0 && (
+                      {pendingInUsd === 0 && pendingOutUsd === 0 && (
                         <span>No pending transfers</span>
                       )}
                     </div>
@@ -240,7 +342,7 @@ export default function WalletsPage() {
                         <ArrowDownToLine size={13} />
                       </button>
                       <button
-                        onClick={() => { setSelectedWallet(w); setWithdrawChain(w.chain); setWithdrawOpen(true); }}
+                        onClick={() => { setSelectedWallet(w); setWithdrawChain(w.chain); setWithdrawCurrency(heldCoins(w)[0] ?? 'USDC'); setWithdrawOpen(true); }}
                         className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600"
                         title="Withdraw"
                       >
@@ -329,23 +431,44 @@ export default function WalletsPage() {
                 <ChainBadge chain={w.chain} />
               </div>
 
-              <div className="grid grid-cols-4 gap-4 bg-gray-50 rounded-lg p-3">
-                <div>
-                  <div className="text-[10px] text-gray-500 uppercase tracking-wide mb-0.5">Balance</div>
-                  <div className="text-sm font-bold text-gray-900">{showBalances ? formatUSDC(w.balance) : '****'}</div>
+              <div className="bg-gray-50 rounded-lg p-3">
+                <div className="flex items-center justify-between mb-2.5">
+                  <span className="text-[10px] uppercase tracking-wide text-gray-500">Holdings</span>
+                  <span className="text-[11px] text-gray-500">
+                    ≈ {showBalances ? formatUSDC(usdTotal(w.balances)) : '****'} total
+                  </span>
                 </div>
-                <div>
-                  <div className="text-[10px] text-gray-500 uppercase tracking-wide mb-0.5">Pending In</div>
-                  <div className="text-sm font-medium text-green-600">{showBalances ? `+${formatUSDC(w.pending_in)}` : '****'}</div>
-                </div>
-                <div>
-                  <div className="text-[10px] text-gray-500 uppercase tracking-wide mb-0.5">Pending Out</div>
-                  <div className="text-sm font-medium text-orange-500">{showBalances ? `-${formatUSDC(w.pending_out)}` : '****'}</div>
-                </div>
-                <div>
-                  <div className="text-[10px] text-gray-500 uppercase tracking-wide mb-0.5">Available</div>
-                  <div className="text-sm font-bold text-gray-900">{showBalances ? formatUSDC(w.balance - w.pending_out) : '****'}</div>
-                </div>
+                {heldCoins(w).length === 0 ? (
+                  <p className="text-xs text-gray-400">No balances on this wallet.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {heldCoins(w).map(sym => {
+                      const bal = w.balances[sym] ?? 0;
+                      const pIn = w.pending_in[sym] ?? 0;
+                      const pOut = w.pending_out[sym] ?? 0;
+                      return (
+                        <div key={sym} className="flex items-center justify-between gap-3">
+                          <CoinBadge currency={sym} size="sm" />
+                          <div className="flex items-center gap-4 text-right">
+                            {pIn > 0 && (
+                              <span className="text-[11px] text-green-600 tabular-nums">
+                                +{showBalances ? formatAmount(pIn, sym) : '***'}
+                              </span>
+                            )}
+                            {pOut > 0 && (
+                              <span className="text-[11px] text-orange-500 tabular-nums">
+                                -{showBalances ? formatAmount(pOut, sym) : '***'}
+                              </span>
+                            )}
+                            <span className="text-sm font-semibold text-gray-900 tabular-nums w-28">
+                              {showBalances ? formatAmount(bal - pOut, sym) : '****'}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center gap-2 mt-4">
@@ -356,7 +479,7 @@ export default function WalletsPage() {
                   <ArrowDownToLine size={12} /> Deposit
                 </button>
                 <button
-                  onClick={() => { setSelectedWallet(w); setWithdrawChain(w.chain); setWithdrawOpen(true); }}
+                  onClick={() => { setSelectedWallet(w); setWithdrawChain(w.chain); setWithdrawCurrency(heldCoins(w)[0] ?? 'USDC'); setWithdrawOpen(true); }}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50"
                 >
                   <ArrowUpFromLine size={12} /> Withdraw
@@ -405,7 +528,7 @@ export default function WalletsPage() {
                         )}
                         {wallet && (
                           <span className="text-xs text-gray-400">
-                            &middot; {showBalances ? formatUSDC(wallet.balance) : '****'}
+                            &middot; ≈ {showBalances ? formatUSDC(usdTotal(wallet.balances)) : '****'}
                           </span>
                         )}
                       </div>
@@ -590,9 +713,32 @@ export default function WalletsPage() {
       >
         {selectedWallet && (
           <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700">Currency</label>
+              <div className="mt-1.5 flex flex-wrap gap-2">
+                {heldCoins(selectedWallet).map(sym => (
+                  <button
+                    key={sym}
+                    onClick={() => setWithdrawCurrency(sym)}
+                    className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-all ${
+                      withdrawCurrency === sym
+                        ? 'border-blue-500 bg-blue-50 text-blue-700 ring-4 ring-blue-500/10'
+                        : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                    }`}
+                  >
+                    <CoinMark currency={sym} size="sm" /> {sym}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="bg-gray-50 rounded-lg p-3 flex items-center justify-between">
               <span className="text-sm text-gray-500">Available balance</span>
-              <span className="text-sm font-bold text-gray-900">{formatUSDC(selectedWallet.balance - selectedWallet.pending_out)}</span>
+              <span className="text-sm font-bold text-gray-900 tabular-nums">
+                {formatAmount(
+                  (selectedWallet.balances[withdrawCurrency] ?? 0) - (selectedWallet.pending_out[withdrawCurrency] ?? 0),
+                  withdrawCurrency,
+                )} {withdrawCurrency}
+              </span>
             </div>
             <div>
               <label className="text-sm font-medium text-gray-700">Recipient Address</label>
@@ -616,7 +762,11 @@ export default function WalletsPage() {
                   className="w-full pl-7 pr-16 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 <button
-                  onClick={() => setWithdrawAmount(((selectedWallet.balance - selectedWallet.pending_out) / 100).toFixed(2))}
+                  onClick={() => {
+                    const avail = (selectedWallet.balances[withdrawCurrency] ?? 0) - (selectedWallet.pending_out[withdrawCurrency] ?? 0);
+                    const c = getCoin(withdrawCurrency);
+                    setWithdrawAmount((avail / c.minorUnits).toFixed(c.precision));
+                  }}
                   className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-medium text-blue-600 hover:text-blue-800 px-1.5 py-0.5"
                 >
                   MAX
@@ -624,6 +774,7 @@ export default function WalletsPage() {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              <CoinBadge currency={withdrawCurrency} size="sm" />
               <ChainBadge chain={selectedWallet.chain} />
               <span className="text-xs text-gray-400">Network fee: ~{selectedWallet.chain === 'ethereum' ? '$2.50' : '$0.01'}</span>
             </div>

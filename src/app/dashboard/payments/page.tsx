@@ -7,9 +7,10 @@ import { StatusPill } from '@/components/ui/status-pill';
 import { getStatusSummary } from '@/components/ui/status-explainer';
 import { WalletChip } from '@/components/ui/wallet-chip';
 import { ChainBadge } from '@/components/ui/chain-badge';
+import { CoinBadge, Money } from '@/components/ui/coin-badge';
 import { DataTable, type Column } from '@/components/ui/data-table';
 import { useToast } from '@/components/ui/toast';
-import { formatUSDC, formatRelativeTime, truncateAddress, getExplorerUrl } from '@/lib/utils';
+import { formatRelativeTime, truncateAddress, getExplorerUrl } from '@/lib/utils';
 import { mockPayments, mockAgents, mockReceipts } from '@/lib/mock-data';
 import type { PaymentIntent, PaymentStatus } from '@/types';
 
@@ -68,24 +69,24 @@ export default function PaymentsPage() {
     {
       key: 'amount',
       header: 'Amount',
-      width: '90px',
+      width: '110px',
       align: 'right',
       sortable: true,
-      render: (p) => <span className="font-semibold text-gray-900">{formatUSDC(p.amount)}</span>,
+      render: (p) => <span className="font-semibold text-gray-900"><Money minor={p.amount} currency={p.currency} showTicker={false} /></span>,
     },
     {
       key: 'fee',
       header: 'Fee',
       width: '70px',
       align: 'right',
-      render: (p) => <span className="text-gray-400">{formatUSDC(p.fee)}</span>,
+      render: (p) => <span className="text-gray-400"><Money minor={p.fee} currency={p.currency} showTicker={false} /></span>,
     },
     {
       key: 'net',
       header: 'Net',
-      width: '90px',
+      width: '110px',
       align: 'right',
-      render: (p) => <span className="font-semibold text-gray-900">{formatUSDC(p.net_amount)}</span>,
+      render: (p) => <span className="font-semibold text-gray-900"><Money minor={p.net_amount} currency={p.currency} showTicker={false} /></span>,
     },
     {
       key: 'customer',
@@ -137,6 +138,12 @@ export default function PaymentsPage() {
           </span>
         );
       },
+    },
+    {
+      key: 'currency',
+      header: 'Currency',
+      width: '90px',
+      render: (p) => <CoinBadge currency={p.currency} size="sm" />,
     },
     {
       key: 'network',

@@ -4,6 +4,8 @@ export type PaymentStatus = 'awaiting_payment' | 'pending' | 'succeeded' | 'fail
 export type RefundMethod = 'direct' | 'claimable' | 'escrow_reversal';
 export type RefundStatus = 'created' | 'processing' | 'completed' | 'failed' | 'awaiting_claim' | 'expired';
 export type Chain = 'base' | 'ethereum' | 'polygon' | 'arbitrum' | 'optimism';
+/** Ticker of a supported stablecoin. See `src/lib/currencies.ts` for the registry. */
+export type Currency = 'USDC' | 'EURC' | 'JPYC' | 'HTGC';
 export type HoldStatus = 'active' | 'captured' | 'released' | 'expired';
 export type SubscriptionStatus = 'active' | 'past_due' | 'canceled' | 'expired' | 'trialing';
 export type ConnectedAccountStatus = 'onboarding' | 'active' | 'suspended';
@@ -18,6 +20,7 @@ export interface Transfer {
   fee: number;
   net_amount: number;
   chain: Chain;
+  currency: Currency;
   status: TransferStatus;
   tx_hash: string | null;
   memo: string | null;
@@ -43,6 +46,7 @@ export interface PaymentIntent {
   amount: number;
   status: PaymentStatus;
   chain: Chain;
+  currency: Currency;
   from_address: string;
   to_address: string;
   tx_hash: string | null;
@@ -108,6 +112,7 @@ export interface Invoice {
   customer_id: string;
   customer_email: string;
   amount: number;
+  currency: Currency;
   status: 'draft' | 'sent' | 'paid' | 'void' | 'overdue';
   due_date: string;
   paid_at: string | null;
@@ -172,6 +177,7 @@ export interface TimelineEvent {
 export interface Hold {
   id: string;
   amount: number;
+  currency: Currency;
   captured_amount: number;
   released_amount: number;
   status: HoldStatus;
@@ -249,6 +255,7 @@ export interface Receipt {
   status: ReceiptStatus;
   amount: number;
   chain: Chain;
+  currency: Currency;
   tx_hash: string | null;
   receipt_url: string;
   sent_at: string | null;

@@ -108,6 +108,7 @@ export async function POST(request: NextRequest) {
     status: 'sent',
     amount: payment.amount,
     chain: payment.chain,
+    currency: payment.currency,
     tx_hash: payment.tx_hash,
     receipt_url: `/r/${id}`,
     sent_at: now,
