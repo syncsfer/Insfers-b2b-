@@ -2,9 +2,10 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, ArrowLeft, ArrowRight, Wallet } from 'lucide-react';
+import Link from 'next/link';
+import { Loader2, ArrowLeft, ArrowRight, Wallet, Eye, EyeOff } from 'lucide-react';
 
-const steps = ['Business', 'Wallet', 'Networks', 'Review'];
+const steps = ['Account', 'Business', 'Wallet', 'Networks', 'Review'];
 
 const networks = [
   { id: 'base', name: 'Base', desc: '~2s confirmation · $0.001 gas' },
@@ -19,15 +20,14 @@ const field =
 
 const label = 'block text-[13px] font-medium text-gray-700 mb-1.5';
 
-/**
- * Post-authentication onboarding. The account itself is created by Auth0, so
- * this picks up at the merchant-specific details we still need.
- */
-export function OnboardingForm({ email }: { email: string }) {
+export function OnboardingForm() {
   const router = useRouter();
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
 
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [businessName, setBusinessName] = useState('');
   const [businessUrl, setBusinessUrl] = useState('');
   const [walletAddress, setWalletAddress] = useState('');
@@ -36,9 +36,10 @@ export function OnboardingForm({ email }: { email: string }) {
   const lastStep = steps.length - 1;
 
   const canProgress = () => {
-    if (step === 0) return Boolean(businessName);
-    if (step === 1) return Boolean(walletAddress);
-    if (step === 2) return selectedNetworks.length > 0;
+    if (step === 0) return Boolean(email) && password.length >= 8;
+    if (step === 1) return Boolean(businessName);
+    if (step === 2) return Boolean(walletAddress);
+    if (step === 3) return selectedNetworks.length > 0;
     return true;
   };
 
@@ -65,8 +66,49 @@ export function OnboardingForm({ email }: { email: string }) {
         </div>
       </div>
 
-      {/* Step 0: Business */}
+      {/* Step 0: Account */}
       {step === 0 && (
+        <div className="animate-fade-in">
+          <h1 className="text-[1.5rem] font-semibold tracking-tight text-gray-900">
+            Create your account
+          </h1>
+          <p className="mt-1.5 text-sm leading-relaxed text-gray-500">
+            Start accepting on-chain payments in a few minutes.
+          </p>
+          <div className="mt-6 space-y-4">
+            <div>
+              <label htmlFor="email" className={label}>Email</label>
+              <input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com" className={field} autoFocus />
+            </div>
+            <div>
+              <label htmlFor="password" className={label}>Password</label>
+              <div className="relative">
+                <input id="password" type={showPassword ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} placeholder="Min. 8 characters" className={`${field} pr-11`} />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 transition-colors hover:text-gray-600"
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+              {password && password.length < 8 && (
+                <p className="mt-1.5 text-[12px] text-red-500">Password must be at least 8 characters</p>
+              )}
+            </div>
+          </div>
+          <p className="mt-5 text-center text-sm text-gray-500">
+            Already have an account?{' '}
+            <Link href="/login" className="font-medium text-blue-600 transition-colors hover:text-blue-700">
+              Sign in
+            </Link>
+          </p>
+        </div>
+      )}
+
+      {/* Step 1: Business */}
+      {step === 1 && (
         <div className="animate-fade-in">
           <h1 className="text-[1.5rem] font-semibold tracking-tight text-gray-900">
             Business details
@@ -89,8 +131,8 @@ export function OnboardingForm({ email }: { email: string }) {
         </div>
       )}
 
-      {/* Step 1: Wallet */}
-      {step === 1 && (
+      {/* Step 2: Wallet */}
+      {step === 2 && (
         <div className="animate-fade-in">
           <h1 className="text-[1.5rem] font-semibold tracking-tight text-gray-900">
             Settlement wallet
@@ -115,8 +157,8 @@ export function OnboardingForm({ email }: { email: string }) {
         </div>
       )}
 
-      {/* Step 2: Networks */}
-      {step === 2 && (
+      {/* Step 3: Networks */}
+      {step === 3 && (
         <div className="animate-fade-in">
           <h1 className="text-[1.5rem] font-semibold tracking-tight text-gray-900">
             Select networks
@@ -155,8 +197,8 @@ export function OnboardingForm({ email }: { email: string }) {
         </div>
       )}
 
-      {/* Step 3: Review */}
-      {step === 3 && (
+      {/* Step 4: Review */}
+      {step === 4 && (
         <div className="animate-fade-in">
           <h1 className="text-[1.5rem] font-semibold tracking-tight text-gray-900">
             Review &amp; finish
