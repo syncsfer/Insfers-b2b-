@@ -3,7 +3,7 @@ import type {
   WebhookEndpoint, ApiKey, WebhookLog, TimelineEvent, DashboardKPIs,
   Chain, Hold, Subscription, Plan, ConnectedAccount, Payout,
   ActionItem, AIAgent, AgentAction, Transfer, SavedRecipient,
-  Receipt, ReceiptSettings, Currency,
+  Receipt, ReceiptSettings, Currency, CatalogCategory, CatalogItem,
 } from '@/types';
 import { STABLECOINS } from '@/lib/currencies';
 
@@ -523,6 +523,63 @@ export const mockReceipts: Receipt[] = mockPayments
     };
   })
   .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+// Product Catalog
+
+export const mockCatalogCategories: CatalogCategory[] = [
+  { id: 'cat_001', name: 'Software & Licences', description: 'Recurring plans, seats, and licence keys', accent: 'blue', created_at: randomDate(180) },
+  { id: 'cat_002', name: 'Professional Services', description: 'Consulting, implementation, and support hours', accent: 'violet', created_at: randomDate(180) },
+  { id: 'cat_003', name: 'Hardware', description: 'Physical devices and accessories', accent: 'emerald', created_at: randomDate(150) },
+  { id: 'cat_004', name: 'Training', description: 'Workshops, courses, and certification', accent: 'amber', created_at: randomDate(120) },
+  { id: 'cat_005', name: 'Add-ons', description: 'Optional extras billed on top of a plan', accent: 'rose', created_at: randomDate(90) },
+];
+
+type SeedItem = [string, string, string, CatalogItem['type'], string, number, Currency, string];
+
+const catalogSeed: SeedItem[] = [
+  // name, description, sku, type, category, price, currency, unit
+  ['Starter Plan', 'Up to 1,000 monthly transactions with standard support.', 'SW-START', 'product', 'cat_001', 2_900, 'USDC', 'per month'],
+  ['Professional Plan', 'Up to 25,000 monthly transactions, priority support, and custom branding.', 'SW-PRO', 'product', 'cat_001', 9_900, 'USDC', 'per month'],
+  ['Enterprise Plan', 'Unlimited volume, dedicated infrastructure, and an account manager.', 'SW-ENT', 'product', 'cat_001', 29_900, 'USDC', 'per month'],
+  ['Additional Seat', 'One extra dashboard user beyond your plan allowance.', 'SW-SEAT', 'product', 'cat_005', 1_200, 'USDC', 'per seat / month'],
+  ['EU Data Residency', 'Store and process all payment data within the EU.', 'AD-EUDR', 'product', 'cat_005', 15_000, 'EURC', 'per month'],
+
+  ['Integration Consulting', 'Hands-on help wiring Chain Payments into your stack.', 'PS-INTEG', 'service', 'cat_002', 18_000, 'USDC', 'per hour'],
+  ['Migration Service', 'Move existing customers and subscriptions from another processor.', 'PS-MIGR', 'service', 'cat_002', 450_000, 'USDC', 'fixed fee'],
+  ['Smart Contract Review', 'Security review of your payment contracts by our engineers.', 'PS-AUDIT', 'service', 'cat_002', 320_000, 'EURC', 'per engagement'],
+  ['Priority Support Retainer', 'Guaranteed 2-hour response, 24/7, with a named engineer.', 'PS-RETAIN', 'service', 'cat_002', 75_000, 'USDC', 'per month'],
+
+  ['Point-of-Sale Terminal', 'Countertop terminal with QR checkout and receipt printer.', 'HW-POS1', 'product', 'cat_003', 34_900, 'USDC', 'each'],
+  ['Card Reader (Bluetooth)', 'Portable reader that pairs with the mobile app.', 'HW-READ', 'product', 'cat_003', 7_900, 'USDC', 'each'],
+  ['Terminal Stand', 'Weighted stand with cable routing for the POS terminal.', 'HW-STAND', 'product', 'cat_003', 4_500, 'USDC', 'each'],
+
+  ['Onboarding Workshop', 'Half-day session getting your team live on the platform.', 'TR-ONBRD', 'service', 'cat_004', 120_000, 'USDC', 'per session'],
+  ['Developer Certification', 'Two-day course plus certification exam for your engineers.', 'TR-CERT', 'service', 'cat_004', 98_000, 'JPYC', 'per attendee'],
+  ['Remittance Partner Training', 'Field training for agents handling gourde settlements.', 'TR-REMIT', 'service', 'cat_004', 1_450_000, 'HTGC', 'per session'],
+];
+
+export const mockCatalogItems: CatalogItem[] = catalogSeed.map(
+  ([name, description, sku, type, category_id, price, currency, unit], i) => {
+    const unitsSold = Math.floor(Math.random() * 220) + (i < 5 ? 40 : 2);
+    return {
+      id: `item_${String(i + 1).padStart(3, '0')}`,
+      name,
+      description,
+      sku,
+      type,
+      category_id,
+      price,
+      currency,
+      unit,
+      active: Math.random() > 0.12,
+      units_sold: unitsSold,
+      revenue: unitsSold * price,
+      trend_30d: Math.round((Math.random() * 70 - 25) * 10) / 10,
+      last_sold_at: unitsSold > 0 ? randomDate(21) : null,
+      created_at: randomDate(160),
+    };
+  },
+);
 
 export const mockVolumeChart = Array.from({ length: 30 }, (_, i) => {
   const d = new Date();

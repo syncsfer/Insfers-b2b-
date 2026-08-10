@@ -277,6 +277,44 @@ export interface ReceiptSettings {
   attach_pdf: boolean;
 }
 
+// Product Catalog
+
+export type CatalogItemType = 'product' | 'service';
+
+/** Accent used to keep a category visually consistent everywhere it appears. */
+export type CategoryAccent = 'blue' | 'violet' | 'emerald' | 'amber' | 'rose' | 'slate';
+
+export interface CatalogCategory {
+  id: string;
+  name: string;
+  description: string;
+  accent: CategoryAccent;
+  created_at: string;
+}
+
+export interface CatalogItem {
+  id: string;
+  name: string;
+  description: string;
+  sku: string;
+  type: CatalogItemType;
+  category_id: string;
+  /** Unit price in the currency's minor units. */
+  price: number;
+  currency: Currency;
+  /** What one unit is, e.g. "each", "hour", "seat / month". */
+  unit: string;
+  active: boolean;
+  // Performance
+  units_sold: number;
+  /** Lifetime revenue in this item's currency, minor units. */
+  revenue: number;
+  /** Percent change in units sold vs the previous 30 days. */
+  trend_30d: number;
+  last_sold_at: string | null;
+  created_at: string;
+}
+
 export type ActionCategory = 'failed_transaction' | 'kyc_review' | 'flagged_activity' | 'dispute' | 'payout_issue' | 'overdue_invoice' | 'expiring_hold' | 'webhook_failure' | 'subscription_dunning' | 'account_review';
 export type ActionPriority = 'critical' | 'high' | 'medium' | 'low';
 

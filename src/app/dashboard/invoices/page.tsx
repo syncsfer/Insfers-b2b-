@@ -2,16 +2,18 @@
 
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { Plus, Send, Eye, MoreHorizontal, Copy, ExternalLink, CheckCircle2, Bot, Wallet } from 'lucide-react';
+import { Plus, Send, Eye, Copy, ExternalLink, CheckCircle2, Bot, Wallet, Package, Search, X } from 'lucide-react';
 import { StatusPill } from '@/components/ui/status-pill';
 import { CoinBadge, Money } from '@/components/ui/coin-badge';
 import { getStatusSummary } from '@/components/ui/status-explainer';
 import { DataTable, type Column } from '@/components/ui/data-table';
 import { Modal } from '@/components/ui/modal';
 import { useToast } from '@/components/ui/toast';
-import { formatUSDC, formatRelativeTime, formatDate } from '@/lib/utils';
-import { mockInvoices, mockAgents } from '@/lib/mock-data';
+import { formatRelativeTime, formatDate } from '@/lib/utils';
+import { mockInvoices, mockAgents, mockCatalogItems, mockCatalogCategories } from '@/lib/mock-data';
 import type { Invoice } from '@/types';
+import { formatAmount } from '@/lib/currencies';
+import { CategoryBadge } from '@/components/ui/category-badge';
 
 const tabs = [
   { label: 'All', value: 'all' },
@@ -28,9 +30,50 @@ export default function InvoicesPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [email, setEmail] = useState('');
   const [description, setDescription] = useState('');
-  const [invoiceAmount, setInvoiceAmount] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [createdInvoice, setCreatedInvoice] = useState<{ id: string; url: string } | null>(null);
+
+  // Catalog-backed line items — the point of the catalog is not retyping these.
+  const [lineItems, setLineItems] = useState<{ itemId: string; quantity: number }[]>([]);
+  const [catalogOpen, setCatalogOpen] = useState(false);
+  const [catalogSearch, setCatalogSearch] = useState('');
+
+  const catalogById = useMemo(() => new Map(mockCatalogItems.map(i => [i.id, i])), []);
+  const categoryById = useMemo(() => new Map(mockCatalogCategories.map(c => [c.id, c])), []);
+
+  const catalogResults = useMemo(() => {
+    const active = mockCatalogItems.filter(i => i.active);
+    if (!catalogSearch) return active;
+    const q = catalogSearch.toLowerCase();
+    return active.filter(i =>
+      i.name.toLowerCase().includes(q) || i.sku.toLowerCase().includes(q));
+  }, [catalogSearch]);
+
+  const addLineItem = (itemId: string) => {
+    setLineItems(prev => {
+      const existing = prev.find(l => l.itemId === itemId);
+      if (existing) {
+        return prev.map(l => l.itemId === itemId ? { ...l, quantity: l.quantity + 1 } : l);
+      }
+      return [...prev, { itemId, quantity: 1 }];
+    });
+    setCatalogOpen(false);
+    setCatalogSearch('');
+  };
+
+  /**
+   * An invoice settles in one currency, so the first item chosen sets it and
+   * anything priced differently is flagged rather than silently converted.
+   */
+  const invoiceCurrency = lineItems.length
+    ? catalogById.get(lineItems[0].itemId)?.currency ?? 'USDC'
+    : 'USDC';
+  const mixedCurrency = lineItems.some(
+    l => catalogById.get(l.itemId)?.currency !== invoiceCurrency);
+  const lineTotal = lineItems.reduce((sum, l) => {
+    const item = catalogById.get(l.itemId);
+    return item && item.currency === invoiceCurrency ? sum + item.price * l.quantity : sum;
+  }, 0);
 
   const handleCreate = (send: boolean) => {
     const newId = `inv_${Math.random().toString(36).slice(2, 8)}`;
@@ -44,8 +87,9 @@ export default function InvoicesPage() {
     setCreatedInvoice(null);
     setEmail('');
     setDescription('');
-    setInvoiceAmount('');
     setDueDate('');
+    setLineItems([]);
+    setCatalogSearch('');
   };
 
   const filtered = useMemo(() => {
@@ -176,8 +220,8 @@ export default function InvoicesPage() {
           ) : (
             <div className="flex gap-3">
               <button onClick={closeCreate} className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50">Cancel</button>
-              <button onClick={() => handleCreate(false)} disabled={!email || !invoiceAmount} className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50">Save draft</button>
-              <button onClick={() => handleCreate(true)} disabled={!email || !invoiceAmount} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50">Send invoice</button>
+              <button onClick={() => handleCreate(false)} disabled={!email || lineItems.length === 0} className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50">Save draft</button>
+              <button onClick={() => handleCreate(true)} disabled={!email || lineItems.length === 0} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50">Send invoice</button>
             </div>
           )
         }
@@ -210,15 +254,126 @@ export default function InvoicesPage() {
               <label className="text-sm font-medium text-gray-700">Description</label>
               <input value={description} onChange={e => setDescription(e.target.value)} placeholder="Consulting services" className="w-full mt-1 px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm font-medium text-gray-700">Amount (USDC)</label>
-                <input type="number" value={invoiceAmount} onChange={e => setInvoiceAmount(e.target.value)} placeholder="0.00" className="w-full mt-1 px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            {/* Catalog line items */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-sm font-medium text-gray-700">Line items</label>
+                <button
+                  onClick={() => setCatalogOpen(!catalogOpen)}
+                  className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-700"
+                >
+                  <Package size={13} /> Add from catalog
+                </button>
               </div>
-              <div>
-                <label className="text-sm font-medium text-gray-700">Due date</label>
-                <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} className="w-full mt-1 px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
+
+              {catalogOpen && (
+                <div className="mb-3 rounded-lg border border-gray-200 overflow-hidden">
+                  <div className="p-2 border-b border-gray-100 bg-gray-50">
+                    <div className="relative">
+                      <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <input
+                        value={catalogSearch}
+                        onChange={e => setCatalogSearch(e.target.value)}
+                        placeholder="Search catalog by name or SKU..."
+                        autoFocus
+                        className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+                  <div className="max-h-52 overflow-y-auto">
+                    {catalogResults.length === 0 ? (
+                      <p className="p-4 text-center text-sm text-gray-400">No matching items</p>
+                    ) : catalogResults.map(item => (
+                      <button
+                        key={item.id}
+                        onClick={() => addLineItem(item.id)}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-gray-50 text-left border-b border-gray-50 last:border-0"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-gray-900 truncate">{item.name}</span>
+                            <CategoryBadge category={categoryById.get(item.category_id)} size="sm" />
+                          </div>
+                          <div className="text-[11px] text-gray-400 font-mono">{item.sku}</div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <div className="text-sm font-semibold text-gray-900">
+                            {formatAmount(item.price, item.currency)}
+                          </div>
+                          <div className="text-[10px] text-gray-400">{item.currency} · {item.unit}</div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {lineItems.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-gray-200 px-4 py-6 text-center">
+                  <Package size={20} className="mx-auto text-gray-300" />
+                  <p className="mt-1.5 text-sm text-gray-500">No items yet</p>
+                  <p className="text-[11px] text-gray-400">
+                    Pull from your catalog instead of retyping prices.
+                  </p>
+                </div>
+              ) : (
+                <div className="rounded-lg border border-gray-200 divide-y divide-gray-100">
+                  {lineItems.map(({ itemId, quantity }) => {
+                    const item = catalogById.get(itemId);
+                    if (!item) return null;
+                    const offCurrency = item.currency !== invoiceCurrency;
+                    return (
+                      <div key={itemId} className="flex items-center gap-3 px-3 py-2.5">
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium text-gray-900 truncate">{item.name}</div>
+                          <div className="text-[11px] text-gray-400">
+                            {formatAmount(item.price, item.currency)} {item.currency} {item.unit}
+                          </div>
+                        </div>
+                        <input
+                          type="number"
+                          min="1"
+                          value={quantity}
+                          onChange={e => {
+                            const q = Math.max(1, parseInt(e.target.value || '1', 10));
+                            setLineItems(prev => prev.map(l => l.itemId === itemId ? { ...l, quantity: q } : l));
+                          }}
+                          className="w-14 px-2 py-1 text-sm text-center border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                        <div className={`w-24 text-right text-sm font-semibold ${offCurrency ? 'text-red-500' : 'text-gray-900'}`}>
+                          {formatAmount(item.price * quantity, item.currency)}
+                        </div>
+                        <button
+                          onClick={() => setLineItems(prev => prev.filter(l => l.itemId !== itemId))}
+                          className="p-1 rounded text-gray-300 hover:text-red-500 hover:bg-red-50"
+                          title="Remove"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    );
+                  })}
+
+                  <div className="flex items-center justify-between px-3 py-2.5 bg-gray-50">
+                    <span className="text-sm font-medium text-gray-700">Total</span>
+                    <span className="text-sm font-bold text-gray-900">
+                      {formatAmount(lineTotal, invoiceCurrency)} {invoiceCurrency}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {mixedCurrency && (
+                <p className="mt-1.5 text-[11px] text-red-500">
+                  An invoice can only bill one currency. Items not priced in {invoiceCurrency} are
+                  excluded from the total — remove them or create a separate invoice.
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-gray-700">Due date</label>
+              <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} className="w-full mt-1 px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
             <div>
               <label className="text-sm font-medium text-gray-700">Memo (optional)</label>

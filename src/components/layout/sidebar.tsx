@@ -6,7 +6,7 @@ import {
   LayoutDashboard, CreditCard, RotateCcw, Users, LinkIcon,
   FileText, BarChart3, Code2, Settings, Zap, TestTube,
   ShieldCheck, RefreshCw, GitBranch, ArrowLeftRight, HelpCircle,
-  AlertCircle, Bot, Send, Wallet, LogOut, Coins,
+  AlertCircle, Bot, Send, Wallet, LogOut, Coins, Package,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -24,6 +24,7 @@ const navItems: { label: string; href: string; icon: React.ElementType; badge?: 
   { label: 'Customers', href: '/dashboard/customers', icon: Users },
   { label: 'Payment Links', href: '/dashboard/payment-links', icon: LinkIcon },
   { label: 'Invoices', href: '/dashboard/invoices', icon: FileText },
+  { label: 'Catalog', href: '/dashboard/catalog', icon: Package },
   { label: 'Wallets', href: '/dashboard/wallets', icon: Wallet },
   { label: 'Reporting', href: '/dashboard/reporting', icon: BarChart3 },
   { label: 'Developers', href: '/dashboard/developer', icon: Code2 },
