@@ -1,16 +1,21 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Search, Filter, Plus, MoreHorizontal, Copy, ExternalLink } from 'lucide-react';
+import {
+  Search, Plus, Copy, ExternalLink, Link2, Mail, Ban, Clock,
+  Check, AlertTriangle, Send, Eye,
+} from 'lucide-react';
 import { StatusPill } from '@/components/ui/status-pill';
 import { getStatusSummary } from '@/components/ui/status-explainer';
-import { WalletChip } from '@/components/ui/wallet-chip';
 import { DataTable, type Column } from '@/components/ui/data-table';
 import { Modal } from '@/components/ui/modal';
 import { useToast } from '@/components/ui/toast';
-import { formatUSDC, formatRelativeTime, truncateAddress } from '@/lib/utils';
-import { mockRefunds, mockPayments } from '@/lib/mock-data';
-import type { Refund, RefundStatus } from '@/types';
+import { formatUSDC, formatRelativeTime, formatDate, truncateAddress, getExplorerUrl } from '@/lib/utils';
+import { formatAmount } from '@/lib/currencies';
+import { CoinBadge, Money } from '@/components/ui/coin-badge';
+import { ChainBadge } from '@/components/ui/chain-badge';
+import { mockRefunds, mockPayments, claimEventsFor } from '@/lib/mock-data';
+import type { Refund, RefundStatus, ClaimEvent } from '@/types';
 
 const tabs: { label: string; value: RefundStatus | 'all' }[] = [
   { label: 'All', value: 'all' },
@@ -20,8 +25,36 @@ const tabs: { label: string; value: RefundStatus | 'all' }[] = [
   { label: 'Awaiting Claim', value: 'awaiting_claim' },
 ];
 
+/** Time until a claim link lapses, or null once it has. */
+function claimTimeLeft(iso: string | null): string | null {
+  if (!iso) return null;
+  const ms = new Date(iso).getTime() - Date.now();
+  if (ms <= 0) return null;
+  const h = Math.floor(ms / 3600_000);
+  const m = Math.floor((ms % 3600_000) / 60_000);
+  if (h >= 24) return `${Math.floor(h / 24)}d ${h % 24}h`;
+  if (h >= 1) return `${h}h ${m}m`;
+  return `${m}m`;
+}
+
+const EVENT_STYLE: Record<ClaimEvent['type'], { icon: React.ElementType; tone: string }> = {
+  created:  { icon: Link2,         tone: 'bg-blue-50 text-blue-600' },
+  notified: { icon: Mail,          tone: 'bg-blue-50 text-blue-600' },
+  reminded: { icon: Send,          tone: 'bg-amber-50 text-amber-600' },
+  opened:   { icon: Eye,           tone: 'bg-gray-100 text-gray-500' },
+  claimed:  { icon: Check,         tone: 'bg-green-50 text-green-600' },
+  expired:  { icon: Clock,         tone: 'bg-gray-100 text-gray-500' },
+  revoked:  { icon: Ban,           tone: 'bg-gray-100 text-gray-500' },
+  failed:   { icon: AlertTriangle, tone: 'bg-red-50 text-red-600' },
+};
+
 export default function RefundsPage() {
   const { toast } = useToast();
+  const [claimRefund, setClaimRefund] = useState<Refund | null>(null);
+  const [revoked, setRevoked] = useState<Set<string>>(new Set());
+
+  const absoluteClaimUrl = (r: Refund) =>
+    `${typeof window !== 'undefined' ? window.location.origin : ''}${r.claim_link ?? ''}`;
   const [activeTab, setActiveTab] = useState<RefundStatus | 'all'>('all');
   const [search, setSearch] = useState('');
   const [wizardOpen, setWizardOpen] = useState(false);
@@ -58,22 +91,63 @@ export default function RefundsPage() {
         <div className="text-[10px] text-gray-400 mt-0.5 leading-tight">{getStatusSummary('refund', r.status)}</div>
       </div>
     ) },
-    { key: 'amount', header: 'Amount', width: '90px', align: 'right', render: (r) => <span className="font-semibold text-gray-900">{formatUSDC(r.amount)}</span> },
+    { key: 'amount', header: 'Amount', width: '120px', align: 'right', render: (r) => <span className="font-semibold text-gray-900"><Money minor={r.amount} currency={r.currency} showTicker={false} /></span> },
+    { key: 'currency', header: 'Currency', width: '90px', render: (r) => <CoinBadge currency={r.currency} size="sm" /> },
     { key: 'payment', header: 'Original Payment', width: '130px', render: (r) => <a href={`/dashboard/payments/${r.payment_intent_id}`} className="text-sm text-blue-600 font-mono hover:text-blue-700">{truncateAddress(r.payment_intent_id)}</a> },
     { key: 'method', header: 'Method', width: '110px', render: (r) => <span className="text-sm capitalize text-gray-600">{r.method === 'claimable' ? 'Claimable' : r.method === 'direct' ? 'Direct' : 'Escrow'}</span> },
     {
-      key: 'tx_link', header: 'Tx Hash / Link', width: '160px',
-      render: (r) => r.tx_hash ? (
-        <div className="flex items-center gap-1.5">
-          <span className="font-mono text-xs text-gray-500">{truncateAddress(r.tx_hash)}</span>
-          <button onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(r.tx_hash!); toast('Copied'); }} className="text-gray-300 hover:text-gray-500"><Copy size={11} /></button>
-        </div>
-      ) : r.claim_link ? (
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs text-blue-600">Claim link</span>
-          <button onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(r.claim_link!); toast('Claim link copied'); }} className="text-gray-300 hover:text-gray-500"><Copy size={11} /></button>
-        </div>
-      ) : <span className="text-gray-300">-</span>,
+      key: 'claim', header: 'Claim', width: '170px',
+      render: (r) => {
+        if (r.method !== 'claimable') {
+          return <span className="text-xs text-gray-300">Direct — no link</span>;
+        }
+        if (revoked.has(r.id) || r.claim_revoked_at) {
+          return <span className="inline-flex items-center gap-1 text-[11px] font-medium text-gray-500"><Ban size={11} /> Revoked</span>;
+        }
+        if (r.claimed_at) {
+          return (
+            <div>
+              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-green-600">
+                <Check size={11} /> Claimed
+              </span>
+              <div className="font-mono text-[10px] text-gray-400">{truncateAddress(r.claimed_by ?? '')}</div>
+            </div>
+          );
+        }
+        if (r.status === 'failed') {
+          return <span className="inline-flex items-center gap-1 text-[11px] font-medium text-red-600"><AlertTriangle size={11} /> Failed</span>;
+        }
+        const left = claimTimeLeft(r.claim_expires_at);
+        if (!left) {
+          return <span className="inline-flex items-center gap-1 text-[11px] font-medium text-gray-500"><Clock size={11} /> Expired</span>;
+        }
+        const urgent = new Date(r.claim_expires_at!).getTime() - Date.now() < 6 * 3600_000;
+        return (
+          <div className="flex items-center gap-1.5">
+            <span className={`inline-flex items-center gap-1 text-[11px] font-medium ${urgent ? 'text-orange-600' : 'text-blue-600'}`}>
+              <Clock size={11} /> {left} left
+            </span>
+            <button
+              onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(absoluteClaimUrl(r)); toast('Claim link copied'); }}
+              title="Copy claim link"
+              className="text-gray-300 hover:text-gray-500"
+            >
+              <Copy size={11} />
+            </button>
+          </div>
+        );
+      },
+    },
+    {
+      key: 'manage', header: '', width: '80px', align: 'right',
+      render: (r) => r.method === 'claimable' ? (
+        <button
+          onClick={(e) => { e.stopPropagation(); setClaimRefund(r); }}
+          className="rounded-md px-2 py-1 text-[11px] font-medium text-blue-600 hover:bg-blue-50"
+        >
+          Manage
+        </button>
+      ) : null,
     },
     { key: 'created', header: 'Created', width: '110px', render: (r) => <span className="text-xs text-gray-500">{formatRelativeTime(r.created_at)}</span> },
   ];
@@ -271,6 +345,203 @@ export default function RefundsPage() {
           </div>
         )}
       </Modal>
+
+      {/* Claim link management */}
+      <Modal
+        open={Boolean(claimRefund)}
+        onClose={() => setClaimRefund(null)}
+        title="Claim link"
+        size="lg"
+        footer={
+          claimRefund && !claimRefund.claimed_at && claimRefund.status !== 'failed' && !revoked.has(claimRefund.id) && claimTimeLeft(claimRefund.claim_expires_at) ? (
+            <div className="flex w-full items-center justify-between gap-3">
+              <button
+                onClick={() => {
+                  setRevoked(prev => new Set(prev).add(claimRefund.id));
+                  toast('Claim link revoked — funds returned to your treasury');
+                  setClaimRefund(null);
+                }}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+              >
+                <Ban size={14} /> Revoke link
+              </button>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => toast(`Reminder sent to ${claimRefund.recipient_email ?? 'the customer'}`)}
+                  disabled={!claimRefund.recipient_email}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  <Send size={14} /> Send reminder
+                </button>
+                <button
+                  onClick={() => { navigator.clipboard.writeText(absoluteClaimUrl(claimRefund)); toast('Claim link copied'); }}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                >
+                  <Copy size={14} /> Copy link
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => setClaimRefund(null)}
+              className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              Close
+            </button>
+          )
+        }
+      >
+        {claimRefund && (() => {
+          const isRevoked = revoked.has(claimRefund.id) || Boolean(claimRefund.claim_revoked_at);
+          const left = claimTimeLeft(claimRefund.claim_expires_at);
+          const events = claimEventsFor(
+            isRevoked && !claimRefund.claim_revoked_at
+              ? { ...claimRefund, claim_revoked_at: new Date().toISOString() }
+              : claimRefund,
+          );
+
+          return (
+            <div className="space-y-5">
+              {/* Summary */}
+              <div className="rounded-xl bg-gray-50 p-4">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <div className="text-2xl font-bold text-gray-900">
+                      {formatAmount(claimRefund.amount, claimRefund.currency)}
+                    </div>
+                    <div className="mt-1.5 flex items-center gap-2">
+                      <CoinBadge currency={claimRefund.currency} size="sm" />
+                      <ChainBadge chain={claimRefund.chain} />
+                    </div>
+                  </div>
+                  <StatusPill status={claimRefund.status} />
+                </div>
+              </div>
+
+              {/* Current state */}
+              {isRevoked ? (
+                <div className="flex items-start gap-2.5 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+                  <Ban size={15} className="mt-0.5 shrink-0 text-gray-500" />
+                  <p className="text-[13px] text-gray-700">
+                    This link was revoked. The funds returned to your treasury and the link no
+                    longer works.
+                  </p>
+                </div>
+              ) : claimRefund.claimed_at ? (
+                <div className="flex items-start gap-2.5 rounded-xl border border-green-200 bg-green-50/70 px-4 py-3">
+                  <Check size={15} className="mt-0.5 shrink-0 text-green-600" />
+                  <div className="text-[13px] text-green-900">
+                    <p>Claimed {formatRelativeTime(claimRefund.claimed_at)} to</p>
+                    <p className="mt-0.5 font-mono text-xs">{claimRefund.claimed_by}</p>
+                  </div>
+                </div>
+              ) : claimRefund.status === 'failed' ? (
+                <div className="flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50/70 px-4 py-3">
+                  <AlertTriangle size={15} className="mt-0.5 shrink-0 text-red-600" />
+                  <p className="text-[13px] text-red-900">
+                    The claim transaction reverted on-chain. No funds left your treasury — issue a
+                    new refund to try again.
+                  </p>
+                </div>
+              ) : left ? (
+                <div className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3">
+                  <Clock size={15} className="mt-0.5 shrink-0 text-amber-600" />
+                  <p className="text-[13px] text-amber-900">
+                    Awaiting claim — <span className="font-semibold">{left}</span> remaining.
+                    Unclaimed funds return to your treasury on{' '}
+                    {claimRefund.claim_expires_at ? formatDate(claimRefund.claim_expires_at) : '—'}.
+                  </p>
+                </div>
+              ) : (
+                <div className="flex items-start gap-2.5 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+                  <Clock size={15} className="mt-0.5 shrink-0 text-gray-500" />
+                  <p className="text-[13px] text-gray-700">
+                    This link expired unclaimed. The funds returned to your treasury — issue a new
+                    refund if the customer still needs it.
+                  </p>
+                </div>
+              )}
+
+              {/* The link itself */}
+              {claimRefund.claim_link && !isRevoked && !claimRefund.claimed_at && left && (
+                <div>
+                  <p className="mb-1.5 text-[13px] font-medium text-gray-700">Claim link</p>
+                  <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 p-2.5">
+                    <span className="flex-1 truncate font-mono text-xs text-gray-700">
+                      {absoluteClaimUrl(claimRefund)}
+                    </span>
+                    <a
+                      href={claimRefund.claim_link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Open claim page"
+                      className="rounded-md p-1.5 text-gray-400 hover:bg-gray-200 hover:text-gray-700"
+                    >
+                      <ExternalLink size={13} />
+                    </a>
+                  </div>
+                  <p className="mt-1.5 text-[11px] text-gray-400">
+                    Anyone with this link can claim the refund to any address, so share it only
+                    with the customer.
+                  </p>
+                </div>
+              )}
+
+              {/* Delivery */}
+              <div className="grid grid-cols-2 gap-3 text-[13px]">
+                <div className="rounded-lg border border-gray-100 p-3">
+                  <div className="text-[11px] text-gray-400">Sent to</div>
+                  <div className="mt-0.5 truncate font-medium text-gray-900">
+                    {claimRefund.recipient_email ?? 'No email on file'}
+                  </div>
+                </div>
+                <div className="rounded-lg border border-gray-100 p-3">
+                  <div className="text-[11px] text-gray-400">Reminders sent</div>
+                  <div className="mt-0.5 font-medium text-gray-900">
+                    {claimRefund.claim_reminders_sent}
+                  </div>
+                </div>
+              </div>
+
+              {/* Lifecycle */}
+              <div>
+                <p className="mb-3 text-[13px] font-medium text-gray-700">Timeline</p>
+                <ol className="space-y-3">
+                  {events.map(ev => {
+                    const st = EVENT_STYLE[ev.type];
+                    return (
+                      <li key={ev.id} className="flex gap-3">
+                        <span className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${st.tone}`}>
+                          <st.icon size={12} />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[13px] text-gray-900">{ev.detail}</p>
+                          <p className="text-[11px] text-gray-400">
+                            {formatDate(ev.timestamp)}
+                            {ev.actor ? ` · ${ev.actor.startsWith('0x') ? truncateAddress(ev.actor) : ev.actor}` : ''}
+                          </p>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ol>
+              </div>
+
+              {claimRefund.tx_hash && (
+                <a
+                  href={getExplorerUrl(claimRefund.chain, claimRefund.tx_hash)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-700"
+                >
+                  View settlement on explorer <ExternalLink size={13} />
+                </a>
+              )}
+            </div>
+          );
+        })()}
+      </Modal>
+
     </div>
   );
 }

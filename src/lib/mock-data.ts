@@ -3,7 +3,7 @@ import type {
   WebhookEndpoint, ApiKey, WebhookLog, TimelineEvent, DashboardKPIs,
   Chain, Hold, Subscription, Plan, ConnectedAccount, Payout,
   ActionItem, AIAgent, AgentAction, Transfer, SavedRecipient,
-  Receipt, ReceiptSettings, Currency, CatalogCategory, CatalogItem,
+  Receipt, ReceiptSettings, Currency, CatalogCategory, CatalogItem, ClaimEvent,
 } from '@/types';
 import { STABLECOINS } from '@/lib/currencies';
 
@@ -63,7 +63,9 @@ function randomDate(daysBack: number): string {
   const d = new Date();
   d.setDate(d.getDate() - Math.floor(Math.random() * daysBack));
   d.setHours(Math.floor(Math.random() * 24), Math.floor(Math.random() * 60));
-  return d.toISOString();
+  // Randomising the hour can push the date past now; clamp so nothing is
+  // "created" in the future and relative times never read negative.
+  return new Date(Math.min(d.getTime(), Date.now() - 1000)).toISOString();
 }
 
 export const mockPayments: PaymentIntent[] = Array.from({ length: 50 }, (_, i) => {
@@ -104,26 +106,95 @@ export const mockPayments: PaymentIntent[] = Array.from({ length: 50 }, (_, i) =
 
 export const mockRefunds: Refund[] = Array.from({ length: 15 }, (_, i) => {
   const payment = mockPayments.filter(p => p.status === 'succeeded')[i % 10];
+  const currency = payment?.currency ?? 'USDC';
+  const chain = payment?.chain ?? 'base';
   const methods: Refund['method'][] = ['direct', 'claimable', 'claimable'];
   const method = methods[Math.floor(Math.random() * methods.length)];
-  const statuses: Refund['status'][] = ['completed', 'processing', 'awaiting_claim', 'failed', 'expired'];
+
+  // Direct refunds never enter the claim lifecycle.
+  const statuses: Refund['status'][] = method === 'direct'
+    ? ['completed', 'completed', 'processing', 'failed']
+    : ['awaiting_claim', 'awaiting_claim', 'completed', 'expired', 'failed'];
   const status = statuses[Math.floor(Math.random() * statuses.length)];
 
+  const id = `ref_${String(i + 1).padStart(3, '0')}${Math.random().toString(36).slice(2, 8)}`;
+  const created = randomDate(14);
+  const createdMs = new Date(created).getTime();
+  const isClaimable = method === 'claimable';
+
+  // Links awaiting a claim must still be live, so their window is measured from
+  // now rather than from creation; some land close to the wire so the countdown
+  // has something to show. Expired ones sit deliberately in the past.
+  const expiresMs = status === 'awaiting_claim'
+    ? Date.now() + (Math.random() > 0.35 ? 6 + Math.random() * 40 : Math.random() * 5) * 3600_000
+    : createdMs + 24 * 3600_000;
+  const claimed = isClaimable && status === 'completed';
+  const claimedAtMs = claimed ? createdMs + Math.random() * 20 * 3600_000 : null;
+
+  const email = payment?.customer_email ?? null;
+  const notified = isClaimable && email ? new Date(createdMs + 60_000).toISOString() : null;
+
   return {
-    id: `ref_${String(i + 1).padStart(3, '0')}${Math.random().toString(36).slice(2, 8)}`,
-    payment_intent_id: payment?.id || `pi_unknown`,
+    id,
+    payment_intent_id: payment?.id || 'pi_unknown',
     amount: payment ? Math.floor(payment.amount * (Math.random() > 0.5 ? 1 : 0.5)) : 5000,
+    currency,
+    chain,
     method,
     status,
-    claim_link: method === 'claimable' ? `https://pay.chainpayments.com/claim/ref_${i}` : null,
-    claim_expires_at: method === 'claimable' ? new Date(Date.now() + 86400000).toISOString() : null,
-    claimed_by: status === 'completed' && method === 'claimable' ? addresses[Math.floor(Math.random() * addresses.length)] : null,
     reason: ['Customer requested', 'Duplicate charge', 'Service not rendered', 'Other'][Math.floor(Math.random() * 4)],
-    tx_hash: ['completed', 'processing'].includes(status) ? `0x${Math.random().toString(16).slice(2)}` : null,
-    created_at: randomDate(14),
-    completed_at: status === 'completed' ? randomDate(7) : null,
+    tx_hash: ['completed', 'processing'].includes(status) ? `0x${Math.random().toString(16).slice(2)}${Math.random().toString(16).slice(2)}` : null,
+    created_at: created,
+    completed_at: status === 'completed' ? new Date(claimedAtMs ?? createdMs + 3600_000).toISOString() : null,
+
+    claim_link: isClaimable ? `/claim/${id}` : null,
+    claim_expires_at: isClaimable ? new Date(expiresMs).toISOString() : null,
+    claimed_by: claimed ? addresses[Math.floor(Math.random() * addresses.length)] : null,
+    claimed_at: claimedAtMs ? new Date(claimedAtMs).toISOString() : null,
+    recipient_email: isClaimable ? email : null,
+    claim_notified_at: notified,
+    claim_reminders_sent: isClaimable && status === 'awaiting_claim' ? Math.floor(Math.random() * 3) : 0,
+    claim_revoked_at: null,
   };
 }).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+/** Reconstructs the claim trail for a refund, newest last. */
+export function claimEventsFor(refund: Refund): ClaimEvent[] {
+  if (refund.method !== 'claimable') return [];
+  const events: ClaimEvent[] = [];
+  let n = 0;
+  const push = (type: ClaimEvent['type'], detail: string, timestamp: string, actor: string | null = null) => {
+    events.push({ id: `${refund.id}_ev_${++n}`, refund_id: refund.id, type, detail, actor, timestamp });
+  };
+
+  push('created', `Claim link created for ${refund.id}`, refund.created_at, 'Acme Corp');
+
+  if (refund.claim_notified_at) {
+    push('notified', `Claim link emailed to ${refund.recipient_email}`, refund.claim_notified_at);
+  }
+  for (let r = 0; r < refund.claim_reminders_sent; r++) {
+    push(
+      'reminded',
+      `Reminder ${r + 1} sent to ${refund.recipient_email}`,
+      new Date(new Date(refund.created_at).getTime() + (r + 1) * 6 * 3600_000).toISOString(),
+    );
+  }
+  if (refund.claimed_at) {
+    push('opened', 'Customer opened the claim page', new Date(new Date(refund.claimed_at).getTime() - 120_000).toISOString());
+    push('claimed', `Claimed to ${refund.claimed_by}`, refund.claimed_at, refund.claimed_by);
+  }
+  if (refund.status === 'expired' && refund.claim_expires_at) {
+    push('expired', 'Link expired unclaimed — funds returned to your treasury', refund.claim_expires_at);
+  }
+  if (refund.claim_revoked_at) {
+    push('revoked', 'Link revoked by merchant — funds returned', refund.claim_revoked_at, 'Acme Corp');
+  }
+  if (refund.status === 'failed') {
+    push('failed', 'Claim transaction reverted on-chain', refund.created_at);
+  }
+
+  return events.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+}
 
 export const mockCustomers: Customer[] = Array.from({ length: 20 }, (_, i) => ({
   id: `cus_${String(i + 1).padStart(3, '0')}`,

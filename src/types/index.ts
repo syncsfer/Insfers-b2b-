@@ -69,15 +69,37 @@ export interface Refund {
   id: string;
   payment_intent_id: string;
   amount: number;
+  currency: Currency;
+  chain: Chain;
   method: RefundMethod;
   status: RefundStatus;
-  claim_link: string | null;
-  claim_expires_at: string | null;
-  claimed_by: string | null;
   reason: string;
   tx_hash: string | null;
   created_at: string;
   completed_at: string | null;
+
+  // Claimable-refund lifecycle. A claim link lets the customer pull funds to
+  // any address they control, rather than us pushing to the paying address.
+  claim_link: string | null;
+  claim_expires_at: string | null;
+  claimed_by: string | null;
+  claimed_at: string | null;
+  /** Where we sent the claim link, if we have an address on file. */
+  recipient_email: string | null;
+  claim_notified_at: string | null;
+  claim_reminders_sent: number;
+  /** Set when the merchant cancels an unclaimed link and pulls the funds back. */
+  claim_revoked_at: string | null;
+}
+
+/** A step in the claim lifecycle, for the merchant-facing timeline. */
+export interface ClaimEvent {
+  id: string;
+  refund_id: string;
+  type: 'created' | 'notified' | 'reminded' | 'opened' | 'claimed' | 'expired' | 'revoked' | 'failed';
+  detail: string;
+  actor: string | null;
+  timestamp: string;
 }
 
 export interface Customer {
