@@ -62,6 +62,7 @@ export default function HowItWorksPage() {
             <a href="#for-you" className="text-sm text-gray-600 hover:text-gray-900 font-medium">Who it&apos;s for</a>
             <a href="#products" className="text-sm text-gray-600 hover:text-gray-900 font-medium">Products</a>
             <Link href="/security" className="text-sm text-gray-600 hover:text-gray-900 font-medium">Security</Link>
+            <Link href="/help" className="text-sm text-gray-600 hover:text-gray-900 font-medium">Help</Link>
             <Link href="/dashboard" className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700">
               Dashboard <ArrowRight size={14} />
             </Link>

@@ -32,6 +32,7 @@ export default function CurrenciesPage() {
           <nav className="flex items-center gap-6 text-sm text-gray-600">
             <Link href="/how-it-works" className="transition-colors hover:text-gray-900">How it works</Link>
             <Link href="/security" className="transition-colors hover:text-gray-900">Security</Link>
+            <Link href="/help" className="transition-colors hover:text-gray-900">Help</Link>
             <Link
               href="/dashboard"
               className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"

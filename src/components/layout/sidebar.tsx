@@ -6,7 +6,7 @@ import {
   LayoutDashboard, CreditCard, RotateCcw, Users, LinkIcon,
   FileText, BarChart3, Code2, Settings, Zap, TestTube,
   ShieldCheck, RefreshCw, GitBranch, ArrowLeftRight, HelpCircle,
-  AlertCircle, Bot, Send, Wallet, LogOut, Coins, Package,
+  AlertCircle, Bot, Send, Wallet, LogOut, Coins, Package, LifeBuoy,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -89,6 +89,9 @@ export function Sidebar() {
 
       {/* Footer */}
       <div className="px-3 py-4 border-t border-border space-y-2">
+        <Link href="/help" className="flex items-center gap-2 px-3 py-1.5 text-[11px] font-medium text-gray-500 hover:text-blue-600 rounded-md hover:bg-blue-50 transition-colors">
+          <LifeBuoy size={13} /> Help & Support
+        </Link>
         <Link href="/currencies" className="flex items-center gap-2 px-3 py-1.5 text-[11px] font-medium text-gray-500 hover:text-blue-600 rounded-md hover:bg-blue-50 transition-colors">
           <Coins size={13} /> Currencies
         </Link>
