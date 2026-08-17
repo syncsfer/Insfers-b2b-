@@ -120,3 +120,31 @@ body {
 .animate-pulse {
   animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
+
+/* Print / PDF export — used by the Help handbook at /help/print */
+@media print {
+  @page {
+    size: A4;
+    margin: 18mm 16mm;
+  }
+
+  html, body {
+    background: #fff;
+  }
+
+  /* Keep brand colours and tinted callouts in the exported PDF. */
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Never strand a heading at the foot of a page. */
+  h1, h2, h3 {
+    break-after: avoid-page;
+  }
+
+  a {
+    text-decoration: none;
+    color: inherit;
+  }
+}

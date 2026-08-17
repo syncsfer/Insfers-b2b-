@@ -2,7 +2,7 @@ import Link from 'next/link';
 import {
   Zap, Rocket, CreditCard, RotateCcw, Wallet, FileText, Coins, Code2,
   ShieldCheck, ArrowRight, Mail, MessageSquare, BookOpen, Activity,
-  CheckCircle2, Clock,
+  CheckCircle2, Clock, Download,
 } from 'lucide-react';
 import { HELP_CATEGORIES, HELP_ARTICLES, HELP_FAQS, articlesInCategory } from '@/lib/help-content';
 import { HelpSearch } from './help-search';
@@ -72,6 +72,12 @@ export default function HelpPage() {
             <Link href="/how-it-works" className="hidden transition-colors hover:text-gray-900 sm:inline">How it works</Link>
             <Link href="/currencies" className="hidden transition-colors hover:text-gray-900 sm:inline">Currencies</Link>
             <Link href="/security" className="hidden transition-colors hover:text-gray-900 sm:inline">Security</Link>
+            <Link
+              href="/help/print"
+              className="hidden items-center gap-1.5 transition-colors hover:text-gray-900 sm:inline-flex"
+            >
+              <Download size={14} /> PDF
+            </Link>
             <Link
               href="/dashboard"
               className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
@@ -275,6 +281,26 @@ export default function HelpPage() {
                 </p>
               </div>
             </div>
+          </div>
+
+          {/* Offline copy */}
+          <div className="mt-6 flex flex-col items-start justify-between gap-4 rounded-xl border border-gray-200 bg-white p-5 sm:flex-row sm:items-center">
+            <div className="flex items-start gap-3">
+              <Download size={17} className="mt-0.5 shrink-0 text-gray-400" />
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900">Take the docs with you</h3>
+                <p className="mt-1 text-[13px] leading-relaxed text-gray-500">
+                  Every article and answer in one document — useful for onboarding a team or
+                  keeping a copy offline.
+                </p>
+              </div>
+            </div>
+            <Link
+              href="/help/print"
+              className="shrink-0 rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+            >
+              Export as PDF
+            </Link>
           </div>
 
           {/* Cross-links */}
