@@ -9,6 +9,8 @@ import { Modal } from '@/components/ui/modal';
 import { useToast } from '@/components/ui/toast';
 import { formatUSDC, formatRelativeTime } from '@/lib/utils';
 import { mockSubscriptions, mockPlans, mockCustomers } from '@/lib/mock-data';
+import { useCollection, newId } from '@/lib/use-collection';
+import type { Plan } from '@/types';
 import type { SubscriptionStatus, Subscription } from '@/types';
 
 const subTabs: { label: string; value: SubscriptionStatus | 'all' }[] = [
@@ -21,6 +23,7 @@ const subTabs: { label: string; value: SubscriptionStatus | 'all' }[] = [
 
 export default function SubscriptionsPage() {
   const { toast } = useToast();
+  const { items: plans, add: addPlan } = useCollection<Plan>('plans', mockPlans);
   const [activeTab, setActiveTab] = useState<SubscriptionStatus | 'all'>('all');
   const [search, setSearch] = useState('');
   const [showPlans, setShowPlans] = useState(false);
@@ -121,7 +124,7 @@ export default function SubscriptionsPage() {
 
       {showPlans ? (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {mockPlans.map(p => (
+          {plans.map(p => (
             <div key={p.id} className="bg-white border border-gray-200 rounded-xl p-5">
               <div className="flex items-center justify-between">
                 <h3 className="text-base font-semibold text-gray-900">{p.name}</h3>
@@ -176,7 +179,24 @@ export default function SubscriptionsPage() {
         footer={
           <div className="flex gap-3">
             <button onClick={() => setCreatePlanOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50">Cancel</button>
-            <button onClick={() => { toast('Plan created'); setCreatePlanOpen(false); }} disabled={!planName || !planAmount} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50">Create plan</button>
+            <button onClick={() => {
+              addPlan({
+                id: newId('plan'),
+                merchant_address: '0x7777777777777777777777777777777777777777',
+                name: planName,
+                amount: Math.round(parseFloat(planAmount || '0') * 100),
+                interval: (planInterval as Plan['interval']) || 'month',
+                interval_seconds: 2592000,
+                trial_days: 0,
+                grace_period: 259200,
+                max_retries: 3,
+                active: true,
+                subscriber_count: 0,
+                created_at: new Date().toISOString(),
+              });
+              toast(`Plan "${planName}" created`);
+              setCreatePlanOpen(false);
+            }} disabled={!planName || !planAmount} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50">Create plan</button>
           </div>
         }
       >

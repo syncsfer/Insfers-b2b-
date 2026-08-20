@@ -8,6 +8,7 @@ import { Modal } from '@/components/ui/modal';
 import { useToast } from '@/components/ui/toast';
 import { formatRelativeTime } from '@/lib/utils';
 import { mockApiKeys, mockWebhooks, mockWebhookLogs } from '@/lib/mock-data';
+import { useCollection, newId } from '@/lib/use-collection';
 import type { ApiKey, WebhookEndpoint, WebhookLog } from '@/types';
 
 const sectionTabs = [
@@ -18,6 +19,8 @@ const sectionTabs = [
 
 export default function DeveloperPage() {
   const { toast } = useToast();
+  const { items: apiKeys, add: addApiKey } = useCollection<ApiKey>('api-keys', mockApiKeys);
+  const { items: webhooks, add: addWebhook } = useCollection<WebhookEndpoint>('webhooks', mockWebhooks);
   const [activeSection, setActiveSection] = useState<string>('api-keys');
   const [showSecret, setShowSecret] = useState<Record<string, boolean>>({});
   const [createKeyOpen, setCreateKeyOpen] = useState(false);
@@ -153,7 +156,7 @@ export default function DeveloperPage() {
             </button>
           </div>
           <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-            <DataTable columns={apiKeyColumns} data={mockApiKeys} keyExtractor={(k) => k.id} emptyMessage="No API keys" />
+            <DataTable columns={apiKeyColumns} data={apiKeys} keyExtractor={(k) => k.id} emptyMessage="No API keys" />
           </div>
 
           {/* Quick reference */}
@@ -179,7 +182,7 @@ export default function DeveloperPage() {
             </button>
           </div>
           <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-            <DataTable columns={webhookColumns} data={mockWebhooks} keyExtractor={(w) => w.id} emptyMessage="No webhook endpoints" />
+            <DataTable columns={webhookColumns} data={webhooks} keyExtractor={(w) => w.id} emptyMessage="No webhook endpoints" />
           </div>
         </div>
       )}
@@ -199,7 +202,19 @@ export default function DeveloperPage() {
         footer={
           <div className="flex gap-3">
             <button onClick={() => setCreateKeyOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg">Cancel</button>
-            <button onClick={() => { toast('API key created'); setCreateKeyOpen(false); }} disabled={!keyName} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg disabled:opacity-50">Create</button>
+            <button onClick={() => {
+              addApiKey({
+                id: newId('key'),
+                name: keyName,
+                key_prefix: `sk_${keyMode === 'live' ? 'live' : 'test'}_${Math.random().toString(36).slice(2, 6)}...${Math.random().toString(36).slice(2, 6)}`,
+                mode: keyMode,
+                created_at: new Date().toISOString(),
+                last_used_at: null,
+              });
+              toast(`API key "${keyName}" created`);
+              setCreateKeyOpen(false);
+              setKeyName('');
+            }} disabled={!keyName} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg disabled:opacity-50">Create</button>
           </div>
         }
       >
@@ -227,7 +242,21 @@ export default function DeveloperPage() {
         footer={
           <div className="flex gap-3">
             <button onClick={() => setCreateWebhookOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg">Cancel</button>
-            <button onClick={() => { toast('Webhook endpoint added'); setCreateWebhookOpen(false); }} disabled={!webhookUrl} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg disabled:opacity-50">Add endpoint</button>
+            <button onClick={() => {
+              addWebhook({
+                id: newId('we'),
+                url: webhookUrl,
+                events: ['payment.succeeded'],
+                active: true,
+                secret: `whsec_${Math.random().toString(36).slice(2, 14)}`,
+                created_at: new Date().toISOString(),
+                last_delivery_at: null,
+                success_rate: 100,
+              });
+              toast('Webhook endpoint added');
+              setCreateWebhookOpen(false);
+              setWebhookUrl('');
+            }} disabled={!webhookUrl} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg disabled:opacity-50">Add endpoint</button>
           </div>
         }
       >

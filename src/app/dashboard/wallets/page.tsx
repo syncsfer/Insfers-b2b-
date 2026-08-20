@@ -15,6 +15,7 @@ import { useToast } from '@/components/ui/toast';
 import { formatUSDC, truncateAddress, getExplorerAddressUrl } from '@/lib/utils';
 import type { Chain, Currency } from '@/types';
 import { STABLECOIN_LIST, getCoin, formatAmount, toUsdCents } from '@/lib/currencies';
+import { useCollection, newId } from '@/lib/use-collection';
 
 type CoinAmounts = Partial<Record<Currency, number>>;
 
@@ -53,7 +54,7 @@ interface NetworkConfig {
   min_payout: number;
 }
 
-const mockWallets: WalletAccount[] = [
+const seedWallets: WalletAccount[] = [
   {
     id: 'w_001', label: 'Primary Treasury', address: '0x7777777777777777777777777777777777777777',
     chain: 'base',
@@ -134,6 +135,9 @@ export default function WalletsPage() {
 
   // Network configs
   const [networkConfigs, setNetworkConfigs] = useState(mockNetworkConfigs);
+
+  // Live so an added wallet appears immediately.
+  const { items: mockWallets, add: addWallet } = useCollection<WalletAccount>('wallets', seedWallets);
 
   // Cross-coin totals are USD-equivalent; per-coin totals are exact.
   const totalBalance = mockWallets.reduce((sum, w) => sum + usdTotal(w.balances), 0);
@@ -590,7 +594,24 @@ export default function WalletsPage() {
               Cancel
             </button>
             <button
-              onClick={() => { toast('Wallet added'); setAddWalletOpen(false); setNewLabel(''); setNewAddress(''); }}
+              onClick={() => {
+                addWallet({
+                  id: newId('w'),
+                  label: newLabel,
+                  address: newAddress,
+                  chain: newChain,
+                  balances: {},
+                  pending_in: {},
+                  pending_out: {},
+                  is_settlement: newIsSettlement,
+                  is_primary: false,
+                  status: 'active',
+                  created_at: new Date().toISOString(),
+                });
+                toast(`${newLabel} added`);
+                setAddWalletOpen(false);
+                setNewLabel(''); setNewAddress(''); setNewIsSettlement(false);
+              }}
               disabled={!newLabel || !/^0x[a-fA-F0-9]{40}$/.test(newAddress)}
               className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
             >

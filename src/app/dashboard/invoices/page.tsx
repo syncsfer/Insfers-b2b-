@@ -11,7 +11,8 @@ import { Modal } from '@/components/ui/modal';
 import { useToast } from '@/components/ui/toast';
 import { formatRelativeTime, formatDate } from '@/lib/utils';
 import { mockInvoices, mockAgents, mockCatalogItems, mockCatalogCategories } from '@/lib/mock-data';
-import type { Invoice } from '@/types';
+import { useCollection, newId } from '@/lib/use-collection';
+import type { Invoice, InvoiceItem } from '@/types';
 import { formatAmount } from '@/lib/currencies';
 import { CategoryBadge } from '@/components/ui/category-badge';
 
@@ -33,21 +34,25 @@ export default function InvoicesPage() {
   const [dueDate, setDueDate] = useState('');
   const [createdInvoice, setCreatedInvoice] = useState<{ id: string; url: string } | null>(null);
 
+  const { items: invoices, add: addInvoice } = useCollection<Invoice>('invoices', mockInvoices);
+
   // Catalog-backed line items — the point of the catalog is not retyping these.
   const [lineItems, setLineItems] = useState<{ itemId: string; quantity: number }[]>([]);
   const [catalogOpen, setCatalogOpen] = useState(false);
   const [catalogSearch, setCatalogSearch] = useState('');
 
-  const catalogById = useMemo(() => new Map(mockCatalogItems.map(i => [i.id, i])), []);
-  const categoryById = useMemo(() => new Map(mockCatalogCategories.map(c => [c.id, c])), []);
+  const { items: catalogItems } = useCollection('catalog-items', mockCatalogItems);
+  const { items: catalogCategories } = useCollection('catalog-categories', mockCatalogCategories);
+  const catalogById = useMemo(() => new Map(catalogItems.map(i => [i.id, i])), [catalogItems]);
+  const categoryById = useMemo(() => new Map(catalogCategories.map(c => [c.id, c])), [catalogCategories]);
 
   const catalogResults = useMemo(() => {
-    const active = mockCatalogItems.filter(i => i.active);
+    const active = catalogItems.filter(i => i.active);
     if (!catalogSearch) return active;
     const q = catalogSearch.toLowerCase();
     return active.filter(i =>
       i.name.toLowerCase().includes(q) || i.sku.toLowerCase().includes(q));
-  }, [catalogSearch]);
+  }, [catalogSearch, catalogItems]);
 
   const addLineItem = (itemId: string) => {
     setLineItems(prev => {
@@ -76,9 +81,41 @@ export default function InvoicesPage() {
   }, 0);
 
   const handleCreate = (send: boolean) => {
-    const newId = `inv_${Math.random().toString(36).slice(2, 8)}`;
-    const url = `${typeof window !== 'undefined' ? window.location.origin : ''}/i/${newId}`;
-    setCreatedInvoice({ id: newId, url });
+    const id = newId('inv');
+    const url = `${typeof window !== 'undefined' ? window.location.origin : ''}/i/${id}`;
+    const now = new Date().toISOString();
+
+    const items: InvoiceItem[] = lineItems.flatMap(l => {
+      const item = catalogById.get(l.itemId);
+      if (!item || item.currency !== invoiceCurrency) return [];
+      return [{
+        description: item.name,
+        quantity: l.quantity,
+        unit_price: item.price,
+        amount: item.price * l.quantity,
+      }];
+    });
+
+    addInvoice({
+      id,
+      customer_id: '',
+      customer_email: email,
+      amount: lineTotal,
+      currency: invoiceCurrency,
+      status: send ? 'sent' : 'draft',
+      due_date: dueDate ? new Date(dueDate).toISOString() : new Date(Date.now() + 14 * 86400_000).toISOString(),
+      paid_at: null,
+      payment_intent_id: null,
+      items,
+      memo: description || null,
+      created_at: now,
+      created_by: 'human',
+      agent_id: null,
+      paid_by: null,
+      paid_by_agent_id: null,
+    });
+
+    setCreatedInvoice({ id, url });
     toast(send ? 'Invoice created and sent' : 'Invoice saved as draft');
   };
 
@@ -93,15 +130,15 @@ export default function InvoicesPage() {
   };
 
   const filtered = useMemo(() => {
-    if (activeTab === 'all') return mockInvoices;
-    return mockInvoices.filter(inv => inv.status === activeTab);
-  }, [activeTab]);
+    if (activeTab === 'all') return invoices;
+    return invoices.filter(inv => inv.status === activeTab);
+  }, [activeTab, invoices]);
 
   const tabCounts = useMemo(() => {
-    const counts: Record<string, number> = { all: mockInvoices.length };
-    for (const inv of mockInvoices) counts[inv.status] = (counts[inv.status] || 0) + 1;
+    const counts: Record<string, number> = { all: invoices.length };
+    for (const inv of invoices) counts[inv.status] = (counts[inv.status] || 0) + 1;
     return counts;
-  }, []);
+  }, [invoices]);
 
   const columns: Column<Invoice>[] = [
     {

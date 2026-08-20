@@ -13,7 +13,8 @@ import { useToast } from '@/components/ui/toast';
 import { formatUSDC, formatRelativeTime } from '@/lib/utils';
 import { STABLECOIN_LIST, getCoin, formatAmount, toUsdCents } from '@/lib/currencies';
 import { mockCatalogItems, mockCatalogCategories } from '@/lib/mock-data';
-import type { CatalogItem, Currency, CategoryAccent } from '@/types';
+import { useCollection, newId } from '@/lib/use-collection';
+import type { CatalogItem, CatalogCategory, Currency, CategoryAccent } from '@/types';
 
 const field =
   'w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 transition-shadow focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/10';
@@ -62,13 +63,17 @@ export default function CatalogPage() {
   const [cDesc, setCDesc] = useState('');
   const [cAccent, setCAccent] = useState<CategoryAccent>('blue');
 
+  // Live collections so newly created records actually appear in the lists.
+  const { items, add: addItem, update: updateItem } = useCollection<CatalogItem>('catalog-items', mockCatalogItems);
+  const { items: categories, add: addCategory } = useCollection<CatalogCategory>('catalog-categories', mockCatalogCategories);
+
   const categoryById = useMemo(
-    () => new Map(mockCatalogCategories.map(c => [c.id, c])),
-    [],
+    () => new Map(categories.map(c => [c.id, c])),
+    [categories],
   );
 
   const filtered = useMemo(() => {
-    let data = mockCatalogItems;
+    let data = items;
     if (categoryFilter !== 'all') data = data.filter(i => i.category_id === categoryFilter);
     if (search) {
       const q = search.toLowerCase();
@@ -79,33 +84,33 @@ export default function CatalogPage() {
       );
     }
     return data;
-  }, [search, categoryFilter]);
+  }, [search, categoryFilter, items]);
 
   // Revenue mixes currencies, so roll up to an approximate USD figure.
-  const totalRevenueUsd = mockCatalogItems.reduce(
+  const totalRevenueUsd = items.reduce(
     (sum, i) => sum + toUsdCents(i.revenue, i.currency), 0);
-  const activeCount = mockCatalogItems.filter(i => i.active).length;
-  const topItem = [...mockCatalogItems].sort(
+  const activeCount = items.filter(i => i.active).length;
+  const topItem = [...items].sort(
     (a, b) => toUsdCents(b.revenue, b.currency) - toUsdCents(a.revenue, a.currency))[0];
 
   const perCategory = useMemo(() =>
-    mockCatalogCategories.map(cat => {
-      const items = mockCatalogItems.filter(i => i.category_id === cat.id);
-      const revenueUsd = items.reduce((s, i) => s + toUsdCents(i.revenue, i.currency), 0);
+    categories.map(cat => {
+      const inCat = items.filter(i => i.category_id === cat.id);
+      const revenueUsd = inCat.reduce((s, i) => s + toUsdCents(i.revenue, i.currency), 0);
       return {
         category: cat,
-        itemCount: items.length,
-        unitsSold: items.reduce((s, i) => s + i.units_sold, 0),
+        itemCount: inCat.length,
+        unitsSold: inCat.reduce((s, i) => s + i.units_sold, 0),
         revenueUsd,
         share: totalRevenueUsd > 0 ? (revenueUsd / totalRevenueUsd) * 100 : 0,
       };
     }).sort((a, b) => b.revenueUsd - a.revenueUsd),
-  [totalRevenueUsd]);
+  [totalRevenueUsd, categories, items]);
 
   const openNew = () => {
     setEditing(null);
     setFName(''); setFDesc(''); setFSku(''); setFType('product');
-    setFCategory(mockCatalogCategories[0]?.id ?? ''); setFPrice('');
+    setFCategory(categories[0]?.id ?? ''); setFPrice('');
     setFCurrency('USDC'); setFUnit('each');
     setItemModalOpen(true);
   };
@@ -228,8 +233,8 @@ export default function CatalogPage() {
       {/* Summary */}
       <div className="mb-6 grid grid-cols-4 gap-4">
         {[
-          { label: 'Catalog items', value: String(mockCatalogItems.length), sub: `${activeCount} active`, icon: Package },
-          { label: 'Categories', value: String(mockCatalogCategories.length), sub: 'Organising your catalog', icon: Layers },
+          { label: 'Catalog items', value: String(items.length), sub: `${activeCount} active`, icon: Package },
+          { label: 'Categories', value: String(categories.length), sub: 'Organising your catalog', icon: Layers },
           { label: 'Catalog revenue', value: `≈ ${formatUSDC(totalRevenueUsd)}`, sub: 'USD equivalent, lifetime', icon: TrendingUp },
           { label: 'Top performer', value: topItem?.name ?? '—', sub: topItem ? `${topItem.units_sold} sold` : '', icon: Boxes, small: true },
         ].map((s) => (
@@ -249,8 +254,8 @@ export default function CatalogPage() {
       {/* Tabs */}
       <div className="mb-4 flex items-center gap-0 border-b border-gray-200">
         {([
-          ['items', `Items (${mockCatalogItems.length})`],
-          ['categories', `Categories (${mockCatalogCategories.length})`],
+          ['items', `Items (${items.length})`],
+          ['categories', `Categories (${categories.length})`],
           ['performance', 'Performance'],
         ] as const).map(([key, text]) => (
           <button
@@ -286,7 +291,7 @@ export default function CatalogPage() {
               className="rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">All categories</option>
-              {mockCatalogCategories.map(c => (
+              {categories.map(c => (
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>
@@ -378,7 +383,7 @@ export default function CatalogPage() {
             </p>
           </div>
           <div className="divide-y divide-gray-100">
-            {[...mockCatalogItems]
+            {[...items]
               .sort((a, b) => toUsdCents(b.revenue, b.currency) - toUsdCents(a.revenue, a.currency))
               .map((item, idx) => {
                 const revUsd = toUsdCents(item.revenue, item.currency);
@@ -437,7 +442,34 @@ export default function CatalogPage() {
             </button>
             <button
               onClick={() => {
-                toast(editing ? `"${fName}" updated` : `"${fName}" added to catalog`);
+                const price = Math.round(parseFloat(fPrice || '0') * getCoin(fCurrency).minorUnits);
+                if (editing) {
+                  updateItem(editing.id, {
+                    name: fName, description: fDesc, sku: fSku, type: fType,
+                    category_id: fCategory, price, currency: fCurrency, unit: fUnit,
+                  });
+                  toast(`"${fName}" updated`);
+                } else {
+                  addItem({
+                    id: newId('item'),
+                    name: fName,
+                    description: fDesc,
+                    sku: fSku || fName.slice(0, 6).toUpperCase().replace(/\s/g, ''),
+                    type: fType,
+                    category_id: fCategory,
+                    price,
+                    currency: fCurrency,
+                    unit: fUnit,
+                    active: true,
+                    // A brand-new item has no sales history yet.
+                    units_sold: 0,
+                    revenue: 0,
+                    trend_30d: 0,
+                    last_sold_at: null,
+                    created_at: new Date().toISOString(),
+                  });
+                  toast(`"${fName}" added to catalog`);
+                }
                 setItemModalOpen(false);
               }}
               disabled={!fName || !fPrice}
@@ -492,7 +524,7 @@ export default function CatalogPage() {
           <div>
             <label className={label}>Category</label>
             <div className="flex flex-wrap gap-2">
-              {mockCatalogCategories.map(c => {
+              {categories.map(c => {
                 const a = CATEGORY_ACCENTS[c.accent];
                 const on = fCategory === c.id;
                 return (
@@ -575,7 +607,22 @@ export default function CatalogPage() {
               Cancel
             </button>
             <button
-              onClick={() => { toast(`Category "${cName}" created`); setCategoryModalOpen(false); setCName(''); setCDesc(''); }}
+              onClick={() => {
+                const id = newId('cat');
+                addCategory({
+                  id,
+                  name: cName,
+                  description: cDesc || 'No description yet',
+                  accent: cAccent,
+                  created_at: new Date().toISOString(),
+                });
+                toast(`Category "${cName}" created`);
+                setCategoryModalOpen(false);
+                setCName(''); setCDesc(''); setCAccent('blue');
+                // Show it straight away rather than leaving the user hunting.
+                setCategoryFilter(id);
+                setActiveTab('categories');
+              }}
               disabled={!cName}
               className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
             >

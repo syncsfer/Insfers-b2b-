@@ -15,6 +15,7 @@ import { Modal } from '@/components/ui/modal';
 import { useToast } from '@/components/ui/toast';
 import { formatUSDC, formatRelativeTime, truncateAddress, getExplorerUrl } from '@/lib/utils';
 import { mockTransfers, mockSavedRecipients } from '@/lib/mock-data';
+import { useCollection, newId } from '@/lib/use-collection';
 import type { Chain, Currency, Transfer, SavedRecipient } from '@/types';
 import { STABLECOINS, STABLECOIN_LIST, getCoin, formatAmount, toUsdCents } from '@/lib/currencies';
 
@@ -80,6 +81,10 @@ export default function SendMoneyPage() {
   // History state
   const [historyTab, setHistoryTab] = useState<'all' | 'completed' | 'pending' | 'failed'>('all');
 
+  // Live collections so saved recipients and completed sends actually appear.
+  const { items: recipients, add: addRecipient } = useCollection<SavedRecipient>('recipients', mockSavedRecipients);
+  const { items: transfers, add: addTransfer } = useCollection<Transfer>('transfers', mockTransfers);
+
   const coin = getCoin(currency);
   const merchantBalance = balances[currency];
   // Parse in the coin's own minor units — yen has no subunit.
@@ -92,24 +97,24 @@ export default function SendMoneyPage() {
   const canProceed = isValidAddress && parsedAmount > 0 && total <= merchantBalance;
 
   const filteredRecipients = useMemo(() => {
-    if (!recipientSearch) return mockSavedRecipients;
+    if (!recipientSearch) return recipients;
     const q = recipientSearch.toLowerCase();
-    return mockSavedRecipients.filter(r =>
+    return recipients.filter(r =>
       r.label.toLowerCase().includes(q) || r.address.toLowerCase().includes(q)
     );
-  }, [recipientSearch]);
+  }, [recipientSearch, recipients]);
 
   const filteredTransfers = useMemo(() => {
-    if (historyTab === 'all') return mockTransfers;
-    return mockTransfers.filter(t => t.status === historyTab);
-  }, [historyTab]);
+    if (historyTab === 'all') return transfers;
+    return transfers.filter(t => t.status === historyTab);
+  }, [historyTab, transfers]);
 
   const historyTabCounts = useMemo(() => ({
-    all: mockTransfers.length,
-    completed: mockTransfers.filter(t => t.status === 'completed').length,
-    pending: mockTransfers.filter(t => t.status === 'pending' || t.status === 'confirming').length,
-    failed: mockTransfers.filter(t => t.status === 'failed').length,
-  }), []);
+    all: transfers.length,
+    completed: transfers.filter(t => t.status === 'completed').length,
+    pending: transfers.filter(t => t.status === 'pending' || t.status === 'confirming').length,
+    failed: transfers.filter(t => t.status === 'failed').length,
+  }), [transfers]);
 
   const changeCurrency = (next: Currency) => {
     setCurrency(next);
@@ -135,7 +140,41 @@ export default function SendMoneyPage() {
     setStep('sending');
     setTimeout(() => {
       const txHash = `0x${Math.random().toString(16).slice(2)}${Math.random().toString(16).slice(2)}`;
-      const txId = `txfr_${Math.random().toString(36).slice(2, 10)}`;
+      const txId = newId('txfr');
+      const now = new Date().toISOString();
+
+      addTransfer({
+        id: txId,
+        recipient_address: recipientAddress,
+        recipient_label: recipientLabel || null,
+        amount: parsedAmount,
+        fee,
+        net_amount: total,
+        chain,
+        currency,
+        status: 'completed',
+        tx_hash: txHash,
+        memo: memo || null,
+        created_at: now,
+        confirmed_at: now,
+      });
+
+      // Honour the "save this recipient" tick from the form.
+      if (saveRecipient && !recipients.some(r => r.address.toLowerCase() === recipientAddress.toLowerCase())) {
+        addRecipient({
+          id: newId('rcpt'),
+          label: recipientLabel || `${recipientAddress.slice(0, 10)}…`,
+          full_name: recipientLabel || 'Unnamed recipient',
+          email: null,
+          address: recipientAddress,
+          chain,
+          total_sent: parsedAmount,
+          transfer_count: 1,
+          last_sent_at: now,
+          created_at: now,
+        });
+      }
+
       setCompletedTx({ id: txId, txHash });
       setStep('success');
     }, 2500);
@@ -639,10 +678,10 @@ export default function SendMoneyPage() {
           {/* Summary cards */}
           <div className="grid grid-cols-4 gap-4 mb-6">
             {[
-              { label: 'Total Sent (30d)', value: `≈ ${formatUSDC(mockTransfers.filter(t => t.status === 'completed').reduce((sum, t) => sum + toUsdCents(t.amount, t.currency), 0))}`, color: 'text-gray-900', note: 'USD equivalent across all currencies' },
+              { label: 'Total Sent (30d)', value: `≈ ${formatUSDC(transfers.filter(t => t.status === 'completed').reduce((sum, t) => sum + toUsdCents(t.amount, t.currency), 0))}`, color: 'text-gray-900', note: 'USD equivalent across all currencies' },
               { label: 'Transfers (30d)', value: mockTransfers.length.toString(), color: 'text-gray-900' },
-              { label: 'Avg. Transfer', value: `≈ ${formatUSDC(Math.round(mockTransfers.reduce((sum, t) => sum + toUsdCents(t.amount, t.currency), 0) / mockTransfers.length))}`, color: 'text-gray-900', note: 'USD equivalent' },
-              { label: 'Total Fees (30d)', value: `≈ ${formatUSDC(mockTransfers.filter(t => t.status === 'completed').reduce((sum, t) => sum + toUsdCents(t.fee, t.currency), 0))}`, color: 'text-gray-500', note: 'USD equivalent' },
+              { label: 'Avg. Transfer', value: `≈ ${formatUSDC(Math.round(transfers.reduce((sum, t) => sum + toUsdCents(t.amount, t.currency), 0) / Math.max(transfers.length, 1)))}`, color: 'text-gray-900', note: 'USD equivalent' },
+              { label: 'Total Fees (30d)', value: `≈ ${formatUSDC(transfers.filter(t => t.status === 'completed').reduce((sum, t) => sum + toUsdCents(t.fee, t.currency), 0))}`, color: 'text-gray-500', note: 'USD equivalent' },
             ].map((stat, i) => (
               <div key={i} className="bg-white border border-gray-200 rounded-xl p-4">
                 <div className="text-xs text-gray-500 mb-1">{stat.label}</div>
@@ -691,7 +730,7 @@ export default function SendMoneyPage() {
       {activeTab === 'recipients' && (
         <div>
           <div className="flex items-center justify-between mb-4">
-            <p className="text-sm text-gray-500">{mockSavedRecipients.length} saved recipients</p>
+            <p className="text-sm text-gray-500">{recipients.length} saved recipients</p>
             <button
               onClick={() => setAddRecipientOpen(true)}
               className="inline-flex items-center gap-2 px-4 h-9 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700"
@@ -701,7 +740,7 @@ export default function SendMoneyPage() {
           </div>
 
           <div className="grid grid-cols-1 gap-3">
-            {mockSavedRecipients.map(r => (
+            {recipients.map(r => (
               <div key={r.id} className="bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-4 hover:border-gray-300 transition-colors">
                 <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 shrink-0">
                   <Star size={18} />
@@ -750,7 +789,23 @@ export default function SendMoneyPage() {
                   Cancel
                 </button>
                 <button
-                  onClick={() => { toast('Recipient saved'); setAddRecipientOpen(false); setNewRecipientLabel(''); setNewRecipientName(''); setNewRecipientEmail(''); setNewRecipientAddress(''); }}
+                  onClick={() => {
+                    addRecipient({
+                      id: newId('rcpt'),
+                      label: newRecipientLabel,
+                      full_name: newRecipientName,
+                      email: newRecipientEmail || null,
+                      address: newRecipientAddress,
+                      chain: newRecipientChain,
+                      total_sent: 0,
+                      transfer_count: 0,
+                      last_sent_at: null,
+                      created_at: new Date().toISOString(),
+                    });
+                    toast(`${newRecipientName} saved`);
+                    setAddRecipientOpen(false);
+                    setNewRecipientLabel(''); setNewRecipientName(''); setNewRecipientEmail(''); setNewRecipientAddress('');
+                  }}
                   disabled={!newRecipientLabel || !newRecipientName || !/^0x[a-fA-F0-9]{40}$/.test(newRecipientAddress)}
                   className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
                 >
