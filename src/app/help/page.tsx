@@ -309,6 +309,8 @@ export default function HelpPage() {
             <Link href="/currencies" className="text-gray-500 transition-colors hover:text-blue-600">Supported currencies</Link>
             <Link href="/security" className="text-gray-500 transition-colors hover:text-blue-600">Trust &amp; security</Link>
             <Link href="/dashboard/developer" className="text-gray-500 transition-colors hover:text-blue-600">Developer docs</Link>
+            <Link href="/legal/privacy" className="text-gray-500 transition-colors hover:text-blue-600">Privacy Policy</Link>
+            <Link href="/legal/terms" className="text-gray-500 transition-colors hover:text-blue-600">Terms of Service</Link>
           </div>
         </div>
       </section>
