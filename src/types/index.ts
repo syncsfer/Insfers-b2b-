@@ -299,6 +299,26 @@ export interface ReceiptSettings {
   attach_pdf: boolean;
 }
 
+// Team & Access
+
+export type TeamRole = 'owner' | 'admin' | 'finance' | 'developer' | 'viewer';
+export type MemberStatus = 'active' | 'invited' | 'suspended';
+
+export interface TeamMember {
+  id: string;
+  name: string;
+  email: string;
+  role: TeamRole;
+  status: MemberStatus;
+  /** Two-factor enrolment — material here because these people can move money. */
+  two_factor_enabled: boolean;
+  last_active_at: string | null;
+  invited_by: string | null;
+  /** Set while status is 'invited'; the invite lapses after this. */
+  invite_expires_at: string | null;
+  created_at: string;
+}
+
 // Product Catalog
 
 export type CatalogItemType = 'product' | 'service';

@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { Building, Users, Shield, Palette, Save, Plus, Trash2, Mail, Eye } from 'lucide-react';
+import { Building, Users, Shield, Palette, Save, Mail, Eye } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
 import { mockReceiptSettings } from '@/lib/mock-data';
+import { TeamSection } from './team-section';
 
 const settingsTabs = [
   { key: 'business', label: 'Business', icon: Building },
@@ -60,7 +61,7 @@ export default function SettingsPage() {
         </div>
 
         {/* Settings content */}
-        <div className="flex-1 max-w-2xl">
+        <div className={`flex-1 ${activeTab === 'team' ? 'max-w-4xl' : 'max-w-2xl'}`}>
           {/* Business */}
           {activeTab === 'business' && (
             <div className="bg-white border border-gray-200 rounded-xl p-6">
@@ -284,42 +285,7 @@ export default function SettingsPage() {
           )}
 
           {/* Team */}
-          {activeTab === 'team' && (
-            <div className="bg-white border border-gray-200 rounded-xl p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-1">Team Members</h2>
-              <p className="text-sm text-gray-500 mb-6">Manage access to your dashboard</p>
-              <div className="space-y-3 mb-4">
-                {[
-                  { name: 'Admin User', email: 'admin@acme.com', role: 'Owner' },
-                  { name: 'Finance Team', email: 'finance@acme.com', role: 'Admin' },
-                  { name: 'Support Agent', email: 'support@acme.com', role: 'Viewer' },
-                ].map((member) => (
-                  <div key={member.email} className="flex items-center gap-4 p-3 border border-gray-200 rounded-lg">
-                    <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 text-xs font-bold">
-                      {member.name[0]}
-                    </div>
-                    <div className="flex-1">
-                      <div className="text-sm font-medium text-gray-900">{member.name}</div>
-                      <div className="text-xs text-gray-500">{member.email}</div>
-                    </div>
-                    <span className={`px-2 py-0.5 text-[11px] font-semibold rounded-full ${
-                      member.role === 'Owner' ? 'bg-purple-50 text-purple-700 border border-purple-200'
-                        : member.role === 'Admin' ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                        : 'bg-gray-50 text-gray-600 border border-gray-200'
-                    }`}>
-                      {member.role}
-                    </span>
-                    {member.role !== 'Owner' && (
-                      <button className="text-gray-400 hover:text-red-500"><Trash2 size={14} /></button>
-                    )}
-                  </div>
-                ))}
-              </div>
-              <button className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50">
-                <Plus size={14} /> Invite member
-              </button>
-            </div>
-          )}
+          {activeTab === 'team' && <TeamSection />}
 
           {/* Security */}
           {activeTab === 'security' && (

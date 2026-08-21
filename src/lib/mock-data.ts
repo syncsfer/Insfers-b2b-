@@ -4,6 +4,7 @@ import type {
   Chain, Hold, Subscription, Plan, ConnectedAccount, Payout,
   ActionItem, AIAgent, AgentAction, Transfer, SavedRecipient,
   Receipt, ReceiptSettings, Currency, CatalogCategory, CatalogItem, ClaimEvent,
+  TeamMember,
 } from '@/types';
 import { STABLECOINS } from '@/lib/currencies';
 
@@ -594,6 +595,19 @@ export const mockReceipts: Receipt[] = mockPayments
     };
   })
   .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+// Team
+
+export const mockTeamMembers: TeamMember[] = [
+  { id: 'tm_001', name: 'Alex Chen', email: 'admin@acme.com', role: 'owner', status: 'active', two_factor_enabled: true, last_active_at: randomDate(0), invited_by: null, invite_expires_at: null, created_at: randomDate(400) },
+  { id: 'tm_002', name: 'Priya Raman', email: 'finance@acme.com', role: 'finance', status: 'active', two_factor_enabled: true, last_active_at: randomDate(1), invited_by: 'Alex Chen', invite_expires_at: null, created_at: randomDate(220) },
+  { id: 'tm_003', name: 'Marcus Webb', email: 'dev@acme.com', role: 'developer', status: 'active', two_factor_enabled: false, last_active_at: randomDate(2), invited_by: 'Alex Chen', invite_expires_at: null, created_at: randomDate(150) },
+  { id: 'tm_004', name: 'Sofia Almeida', email: 'support@acme.com', role: 'viewer', status: 'active', two_factor_enabled: false, last_active_at: randomDate(6), invited_by: 'Priya Raman', invite_expires_at: null, created_at: randomDate(90) },
+  { id: 'tm_005', name: 'Daniel Okafor', email: 'ops@acme.com', role: 'admin', status: 'active', two_factor_enabled: true, last_active_at: randomDate(0), invited_by: 'Alex Chen', invite_expires_at: null, created_at: randomDate(60) },
+  { id: 'tm_006', name: 'Yuki Tanaka', email: 'yuki@acme.com', role: 'finance', status: 'invited', two_factor_enabled: false, last_active_at: null, invited_by: 'Alex Chen', invite_expires_at: new Date(Date.now() + 46 * 3600_000).toISOString(), created_at: randomDate(2) },
+  { id: 'tm_007', name: 'Tom Baptiste', email: 'tom.b@acme.com', role: 'viewer', status: 'invited', two_factor_enabled: false, last_active_at: null, invited_by: 'Daniel Okafor', invite_expires_at: new Date(Date.now() + 5 * 3600_000).toISOString(), created_at: randomDate(3) },
+  { id: 'tm_008', name: 'Rachel Stone', email: 'rachel@acme.com', role: 'admin', status: 'suspended', two_factor_enabled: true, last_active_at: randomDate(45), invited_by: 'Alex Chen', invite_expires_at: null, created_at: randomDate(300) },
+];
 
 // Product Catalog
 
