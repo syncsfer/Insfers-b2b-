@@ -119,8 +119,9 @@ export interface Customer {
 export interface PaymentLink {
   id: string;
   name: string;
+  /** null means the payer chooses the amount. */
   amount: number | null;
-  currency: string;
+  currency: Currency;
   url: string;
   active: boolean;
   chains: Chain[];

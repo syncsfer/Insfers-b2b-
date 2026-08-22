@@ -6,9 +6,11 @@ import { FileText, Download, CheckCircle2, Clock, AlertCircle, Zap, ExternalLink
 import { StatusPill } from '@/components/ui/status-pill';
 import { ChainBadge } from '@/components/ui/chain-badge';
 import { useToast } from '@/components/ui/toast';
-import { formatUSDC, formatDate } from '@/lib/utils';
+import { formatDate } from '@/lib/utils';
+import { getCoin, formatAmount } from '@/lib/currencies';
 import { mockInvoices, mockCustomers, mockReceipts } from '@/lib/mock-data';
-import type { Chain } from '@/types';
+import { useCollection } from '@/lib/use-collection';
+import type { Chain, Invoice } from '@/types';
 
 export default function PublicInvoicePage({ params }: { params: Promise<{ invoiceId: string }> }) {
   const { invoiceId } = use(params);
@@ -16,9 +18,43 @@ export default function PublicInvoicePage({ params }: { params: Promise<{ invoic
   const [selectedChain, setSelectedChain] = useState<Chain>('base');
   const [paying, setPaying] = useState(false);
 
-  // Look up invoice by id; fall back to first invoice for demo if not found
-  const invoice = mockInvoices.find(inv => inv.id === invoiceId) ?? mockInvoices[0];
+  // Same store the dashboard writes to, so an invoice just created resolves here.
+  const { items: invoices } = useCollection<Invoice>('invoices', mockInvoices);
+  const invoice = invoices.find(inv => inv.id === invoiceId) ?? null;
+
+  if (!invoice) return <InvoiceNotFound />;
+
+  return <InvoiceView invoice={invoice} selectedChain={selectedChain} setSelectedChain={setSelectedChain} paying={paying} setPaying={setPaying} toast={toast} />;
+}
+
+function InvoiceNotFound() {
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-6">
+      <div className="w-full max-w-md bg-white rounded-xl border border-gray-200 p-8 text-center">
+        <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
+          <AlertCircle size={20} className="text-gray-400" />
+        </div>
+        <h2 className="text-lg font-semibold text-gray-900">Invoice not found</h2>
+        <p className="text-sm text-gray-500 mt-2">
+          We couldn’t find an invoice at this address. Check the link with whoever sent it.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function InvoiceView({
+  invoice, selectedChain, setSelectedChain, paying, setPaying, toast,
+}: {
+  invoice: Invoice;
+  selectedChain: Chain;
+  setSelectedChain: (c: Chain) => void;
+  paying: boolean;
+  setPaying: (p: boolean) => void;
+  toast: (message: string) => void;
+}) {
   const customer = mockCustomers.find(c => c.id === invoice.customer_id);
+  const coin = getCoin(invoice.currency);
 
   const isPaid = invoice.status === 'paid';
   const isVoid = invoice.status === 'void';
@@ -27,7 +63,9 @@ export default function PublicInvoicePage({ params }: { params: Promise<{ invoic
     ? mockReceipts.find(r => r.payment_intent_id === invoice.payment_intent_id)?.receipt_url ?? null
     : null;
   const isOverdue = new Date(invoice.due_date) < new Date() && !isPaid && !isVoid;
-  const chains: Chain[] = ['base', 'ethereum', 'polygon', 'arbitrum', 'optimism'];
+  // Only the networks this invoice's coin settles on.
+  const chains: Chain[] = coin.networks;
+  const activeChain = chains.includes(selectedChain) ? selectedChain : chains[0];
 
   function handlePay() {
     setPaying(true);
@@ -134,8 +172,8 @@ export default function PublicInvoicePage({ params }: { params: Promise<{ invoic
                   <tr key={i} className="border-b border-gray-50 last:border-0">
                     <td className="py-3 text-gray-900">{item.description}</td>
                     <td className="py-3 text-right text-gray-600">{item.quantity}</td>
-                    <td className="py-3 text-right text-gray-600">{formatUSDC(item.unit_price)}</td>
-                    <td className="py-3 text-right font-medium text-gray-900">{formatUSDC(item.amount)}</td>
+                    <td className="py-3 text-right text-gray-600">{formatAmount(item.unit_price, coin.symbol)}</td>
+                    <td className="py-3 text-right font-medium text-gray-900">{formatAmount(item.amount, coin.symbol)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -147,8 +185,8 @@ export default function PublicInvoicePage({ params }: { params: Promise<{ invoic
             <div className="flex justify-between items-baseline">
               <div className="text-sm text-gray-500">Total</div>
               <div className="text-right">
-                <div className="text-2xl font-bold text-gray-900">{formatUSDC(invoice.amount)}</div>
-                <div className="text-xs text-gray-500 mt-0.5">USDC</div>
+                <div className="text-2xl font-bold text-gray-900">{formatAmount(invoice.amount, coin.symbol)}</div>
+                <div className="text-xs text-gray-500 mt-0.5">{coin.symbol} · {coin.name}</div>
               </div>
             </div>
           </div>
@@ -165,7 +203,7 @@ export default function PublicInvoicePage({ params }: { params: Promise<{ invoic
         {/* Pay section */}
         {!isPaid && !isVoid && (
           <div className="mt-6 bg-white rounded-xl border border-gray-200 p-6">
-            <h2 className="text-base font-semibold text-gray-900 mb-4">Pay with USDC</h2>
+            <h2 className="text-base font-semibold text-gray-900 mb-4">Pay with {coin.symbol}</h2>
             <div>
               <p className="text-xs font-medium text-gray-500 mb-2">Choose network</p>
               <div className="flex flex-wrap gap-2">
@@ -174,7 +212,7 @@ export default function PublicInvoicePage({ params }: { params: Promise<{ invoic
                     key={c}
                     onClick={() => setSelectedChain(c)}
                     className={`px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
-                      selectedChain === c ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                      activeChain === c ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
                     }`}
                   >
                     <ChainBadge chain={c} />
@@ -195,14 +233,14 @@ export default function PublicInvoicePage({ params }: { params: Promise<{ invoic
                 </>
               ) : (
                 <>
-                  Pay {formatUSDC(invoice.amount)}
+                  Pay {formatAmount(invoice.amount, coin.symbol)}
                   <ExternalLink size={14} />
                 </>
               )}
             </button>
 
             <p className="text-[11px] text-gray-400 text-center mt-3">
-              You'll be redirected to a secure checkout to complete payment with your wallet.
+              You&rsquo;ll be redirected to a secure checkout to complete payment with your wallet.
             </p>
           </div>
         )}

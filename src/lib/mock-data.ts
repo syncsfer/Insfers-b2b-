@@ -211,18 +211,34 @@ export const mockCustomers: Customer[] = Array.from({ length: 20 }, (_, i) => ({
   created_at: randomDate(180),
 }));
 
-export const mockPaymentLinks: PaymentLink[] = Array.from({ length: 8 }, (_, i) => ({
-  id: `pl_${String(i + 1).padStart(3, '0')}`,
-  name: ['Pro Plan', 'Starter Plan', 'Donation', 'Event Ticket', 'Consultation Fee', 'Workshop', 'Merch', 'Custom'][i],
-  amount: [9900, 2900, null, 5000, 15000, 7500, 3500, null][i],
-  currency: 'USDC',
-  url: `/l/pl_${String(i + 1).padStart(3, '0')}`,
-  active: Math.random() > 0.2,
-  chains: ['base', 'ethereum'] as Chain[],
-  payment_count: Math.floor(Math.random() * 100),
-  total_collected: Math.floor(Math.random() * 1000000),
-  created_at: randomDate(60),
-}));
+export const mockPaymentLinks: PaymentLink[] = Array.from({ length: 8 }, (_, i) => {
+  const names = ['Pro Plan', 'Starter Plan', 'Donation', 'Event Ticket', 'Consultation Fee', 'Workshop', 'Merch', 'Custom'];
+  // Amounts are in each currency's own minor units, so they differ in magnitude.
+  const seeds: [number | null, Currency][] = [
+    [9_900, 'USDC'],
+    [2_900, 'USDC'],
+    [null, 'USDC'],
+    [5_000, 'EURC'],
+    [15_000, 'EURC'],
+    [12_000, 'JPYC'],
+    [3_500, 'USDC'],
+    [null, 'HTGC'],
+  ];
+  const [amount, currency] = seeds[i];
+  return {
+    id: `pl_${String(i + 1).padStart(3, '0')}`,
+    name: names[i],
+    amount,
+    currency,
+    url: `/l/pl_${String(i + 1).padStart(3, '0')}`,
+    active: Math.random() > 0.2,
+    // Only offer networks the chosen coin actually settles on.
+    chains: STABLECOINS[currency].networks.slice(0, 2),
+    payment_count: Math.floor(Math.random() * 100),
+    total_collected: Math.floor(Math.random() * 1000000),
+    created_at: randomDate(60),
+  };
+});
 
 export const mockInvoices: Invoice[] = Array.from({ length: 12 }, (_, i) => {
   const statuses: Invoice['status'][] = ['paid', 'sent', 'draft', 'overdue', 'void'];

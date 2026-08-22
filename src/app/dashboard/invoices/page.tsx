@@ -12,8 +12,9 @@ import { useToast } from '@/components/ui/toast';
 import { formatRelativeTime, formatDate } from '@/lib/utils';
 import { mockInvoices, mockAgents, mockCatalogItems, mockCatalogCategories } from '@/lib/mock-data';
 import { useCollection, newId } from '@/lib/use-collection';
-import type { Invoice, InvoiceItem } from '@/types';
+import type { Invoice, InvoiceItem, Currency } from '@/types';
 import { formatAmount } from '@/lib/currencies';
+import { CurrencySelect, CurrencyHint } from '@/components/ui/currency-select';
 import { CategoryBadge } from '@/components/ui/category-badge';
 
 const tabs = [
@@ -32,6 +33,7 @@ export default function InvoicesPage() {
   const [email, setEmail] = useState('');
   const [description, setDescription] = useState('');
   const [dueDate, setDueDate] = useState('');
+  const [invoiceCurrency, setInvoiceCurrency] = useState<Currency>('USDC');
   const [createdInvoice, setCreatedInvoice] = useState<{ id: string; url: string } | null>(null);
 
   const { items: invoices, add: addInvoice } = useCollection<Invoice>('invoices', mockInvoices);
@@ -46,13 +48,24 @@ export default function InvoicesPage() {
   const catalogById = useMemo(() => new Map(catalogItems.map(i => [i.id, i])), [catalogItems]);
   const categoryById = useMemo(() => new Map(catalogCategories.map(c => [c.id, c])), [catalogCategories]);
 
+  /** How many active items exist per currency — drives the currency picker. */
+  const itemsPerCurrency = useMemo(() => {
+    const counts: Partial<Record<Currency, number>> = {};
+    for (const i of catalogItems) {
+      if (i.active) counts[i.currency] = (counts[i.currency] ?? 0) + 1;
+    }
+    return counts;
+  }, [catalogItems]);
+
+  // Only items priced in the invoice's currency are offerable — an invoice
+  // bills one currency, and mixing them would need an FX rate we don't quote.
   const catalogResults = useMemo(() => {
-    const active = catalogItems.filter(i => i.active);
+    const active = catalogItems.filter(i => i.active && i.currency === invoiceCurrency);
     if (!catalogSearch) return active;
     const q = catalogSearch.toLowerCase();
     return active.filter(i =>
       i.name.toLowerCase().includes(q) || i.sku.toLowerCase().includes(q));
-  }, [catalogSearch, catalogItems]);
+  }, [catalogSearch, catalogItems, invoiceCurrency]);
 
   const addLineItem = (itemId: string) => {
     setLineItems(prev => {
@@ -67,14 +80,16 @@ export default function InvoicesPage() {
   };
 
   /**
-   * An invoice settles in one currency, so the first item chosen sets it and
-   * anything priced differently is flagged rather than silently converted.
+   * Changing currency clears items priced in the old one. The catalog picker
+   * only ever offers matching items, so this is the only way a mismatch can
+   * arise — and dropping them is clearer than carrying dead rows that don't
+   * count toward the total.
    */
-  const invoiceCurrency = lineItems.length
-    ? catalogById.get(lineItems[0].itemId)?.currency ?? 'USDC'
-    : 'USDC';
-  const mixedCurrency = lineItems.some(
-    l => catalogById.get(l.itemId)?.currency !== invoiceCurrency);
+  const changeCurrency = (next: Currency) => {
+    setInvoiceCurrency(next);
+    setLineItems(prev => prev.filter(l => catalogById.get(l.itemId)?.currency === next));
+  };
+
   const lineTotal = lineItems.reduce((sum, l) => {
     const item = catalogById.get(l.itemId);
     return item && item.currency === invoiceCurrency ? sum + item.price * l.quantity : sum;
@@ -125,6 +140,7 @@ export default function InvoicesPage() {
     setEmail('');
     setDescription('');
     setDueDate('');
+    setInvoiceCurrency('USDC');
     setLineItems([]);
     setCatalogSearch('');
   };
@@ -291,6 +307,21 @@ export default function InvoicesPage() {
               <label className="text-sm font-medium text-gray-700">Description</label>
               <input value={description} onChange={e => setDescription(e.target.value)} placeholder="Consulting services" className="w-full mt-1 px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
+
+            <div>
+              <label className="text-sm font-medium text-gray-700">Bill in</label>
+              <CurrencySelect
+                value={invoiceCurrency}
+                onChange={changeCurrency}
+                isDisabled={(symbol) =>
+                  itemsPerCurrency[symbol]
+                    ? null
+                    : `No active catalog items are priced in ${symbol}`}
+                className="mt-1.5"
+              />
+              <CurrencyHint currency={invoiceCurrency} />
+            </div>
+
             {/* Catalog line items */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
@@ -319,7 +350,9 @@ export default function InvoicesPage() {
                   </div>
                   <div className="max-h-52 overflow-y-auto">
                     {catalogResults.length === 0 ? (
-                      <p className="p-4 text-center text-sm text-gray-400">No matching items</p>
+                      <p className="p-4 text-center text-sm text-gray-400">
+                        No {invoiceCurrency} items match
+                      </p>
                     ) : catalogResults.map(item => (
                       <button
                         key={item.id}
@@ -350,7 +383,7 @@ export default function InvoicesPage() {
                   <Package size={20} className="mx-auto text-gray-300" />
                   <p className="mt-1.5 text-sm text-gray-500">No items yet</p>
                   <p className="text-[11px] text-gray-400">
-                    Pull from your catalog instead of retyping prices.
+                    Pull {invoiceCurrency} items from your catalog instead of retyping prices.
                   </p>
                 </div>
               ) : (
@@ -358,7 +391,6 @@ export default function InvoicesPage() {
                   {lineItems.map(({ itemId, quantity }) => {
                     const item = catalogById.get(itemId);
                     if (!item) return null;
-                    const offCurrency = item.currency !== invoiceCurrency;
                     return (
                       <div key={itemId} className="flex items-center gap-3 px-3 py-2.5">
                         <div className="flex-1 min-w-0">
@@ -377,7 +409,7 @@ export default function InvoicesPage() {
                           }}
                           className="w-14 px-2 py-1 text-sm text-center border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
                         />
-                        <div className={`w-24 text-right text-sm font-semibold ${offCurrency ? 'text-red-500' : 'text-gray-900'}`}>
+                        <div className="w-24 text-right text-sm font-semibold text-gray-900">
                           {formatAmount(item.price * quantity, item.currency)}
                         </div>
                         <button
@@ -400,12 +432,6 @@ export default function InvoicesPage() {
                 </div>
               )}
 
-              {mixedCurrency && (
-                <p className="mt-1.5 text-[11px] text-red-500">
-                  An invoice can only bill one currency. Items not priced in {invoiceCurrency} are
-                  excluded from the total — remove them or create a separate invoice.
-                </p>
-              )}
             </div>
 
             <div>

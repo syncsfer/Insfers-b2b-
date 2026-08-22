@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { mockPaymentLinks } from '@/lib/mock-data';
 import { generateId } from '@/lib/utils';
-import type { Chain } from '@/types';
+import { STABLECOINS, DEFAULT_CURRENCY, type StablecoinSymbol } from '@/lib/currencies';
+import type { Chain, Currency } from '@/types';
 
 const VALID_CHAINS: Chain[] = ['base', 'ethereum', 'polygon', 'arbitrum', 'optimism'];
+const VALID_CURRENCIES = Object.keys(STABLECOINS) as StablecoinSymbol[];
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
@@ -70,13 +72,16 @@ export async function POST(request: NextRequest) {
 
   // Validate currency
   if (currency !== undefined && currency !== null) {
-    if (typeof currency !== 'string') {
+    if (typeof currency !== 'string' || !VALID_CURRENCIES.includes(currency as StablecoinSymbol)) {
       return NextResponse.json(
-        { error: 'currency must be a string' },
+        { error: `currency must be one of: ${VALID_CURRENCIES.join(', ')}` },
         { status: 400 }
       );
     }
   }
+
+  const resolvedCurrency = ((currency as Currency) || DEFAULT_CURRENCY) as StablecoinSymbol;
+  const coin = STABLECOINS[resolvedCurrency];
 
   // Validate chains
   if (chains !== undefined) {
@@ -93,6 +98,14 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+    // A link can only settle where its coin actually exists.
+    const unsupported = (chains as Chain[]).filter((c) => !coin.networks.includes(c));
+    if (unsupported.length > 0) {
+      return NextResponse.json(
+        { error: `${resolvedCurrency} does not settle on: ${unsupported.join(', ')}. Supported networks: ${coin.networks.join(', ')}` },
+        { status: 400 }
+      );
+    }
   }
 
   const id = generateId('pl');
@@ -102,10 +115,10 @@ export async function POST(request: NextRequest) {
     id,
     name: (name as string).trim(),
     amount: (amount as number | null) ?? null,
-    currency: (currency as string) || 'USDC',
+    currency: resolvedCurrency,
     url: `https://pay.chainpayments.com/link/${id}`,
     active: true,
-    chains: ((chains as Chain[]) || ['base', 'ethereum']) as Chain[],
+    chains: ((chains as Chain[]) || coin.networks.slice(0, 2)) as Chain[],
     payment_count: 0,
     total_collected: 0,
     created_at: now,

@@ -2,28 +2,69 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Plus, Copy, ExternalLink, MoreHorizontal, Eye, Link as LinkIcon, CheckCircle2 } from 'lucide-react';
+import { Plus, Copy, ExternalLink, Eye, CheckCircle2 } from 'lucide-react';
 import { StatusPill } from '@/components/ui/status-pill';
 import { ChainBadge } from '@/components/ui/chain-badge';
+import { CoinBadge, Money } from '@/components/ui/coin-badge';
+import { CurrencySelect, CurrencyHint } from '@/components/ui/currency-select';
 import { DataTable, type Column } from '@/components/ui/data-table';
 import { Modal } from '@/components/ui/modal';
 import { useToast } from '@/components/ui/toast';
-import { formatUSDC } from '@/lib/utils';
 import { mockPaymentLinks } from '@/lib/mock-data';
-import type { PaymentLink, Chain } from '@/types';
+import { useCollection, newId } from '@/lib/use-collection';
+import { STABLECOINS, getCoin } from '@/lib/currencies';
+import type { PaymentLink, Chain, Currency } from '@/types';
 
 export default function PaymentLinksPage() {
   const { toast } = useToast();
   const [createOpen, setCreateOpen] = useState(false);
   const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
+  const [currency, setCurrency] = useState<Currency>('USDC');
   const [selectedChains, setSelectedChains] = useState<Chain[]>(['base']);
   const [createdLink, setCreatedLink] = useState<{ id: string; url: string } | null>(null);
 
+  const { items: links, add: addLink } = useCollection<PaymentLink>('payment-links', mockPaymentLinks);
+
+  const coin = getCoin(currency);
+
+  /**
+   * A coin only exists on some networks, so switching currency has to prune any
+   * chain that no longer applies — and fall back to the coin's primary network
+   * rather than leaving the link with nowhere to settle.
+   */
+  const changeCurrency = (next: Currency) => {
+    setCurrency(next);
+    setSelectedChains(prev => {
+      const kept = prev.filter(c => STABLECOINS[next].networks.includes(c));
+      return kept.length > 0 ? kept : [STABLECOINS[next].networks[0]];
+    });
+  };
+
   const handleCreate = () => {
-    const newId = `pl_${Math.random().toString(36).slice(2, 8)}`;
-    const url = `${typeof window !== 'undefined' ? window.location.origin : ''}/l/${newId}`;
-    setCreatedLink({ id: newId, url });
+    const id = newId('pl');
+    const url = `/l/${id}`;
+    // Amounts are stored in the currency's minor units — cents for USDC, whole
+    // yen for JPYC — so the multiplier comes from the coin, not a fixed 100.
+    const parsed = amount.trim() === '' ? null : Math.round(parseFloat(amount) * coin.minorUnits);
+
+    addLink({
+      id,
+      name,
+      amount: parsed !== null && Number.isFinite(parsed) ? parsed : null,
+      currency,
+      url,
+      active: true,
+      chains: selectedChains,
+      payment_count: 0,
+      total_collected: 0,
+      created_at: new Date().toISOString(),
+    });
+
+    setCreatedLink({
+      id,
+      url: `${typeof window !== 'undefined' ? window.location.origin : ''}${url}`,
+    });
     toast('Payment link created');
   };
 
@@ -32,6 +73,7 @@ export default function PaymentLinksPage() {
     setCreatedLink(null);
     setName('');
     setAmount('');
+    setCurrency('USDC');
     setSelectedChains(['base']);
   };
 
@@ -51,12 +93,18 @@ export default function PaymentLinksPage() {
       ),
     },
     {
-      key: 'amount', header: 'Amount', width: '100px', align: 'right',
-      render: (l) => l.amount ? (
-        <span className="font-semibold text-gray-900">{formatUSDC(l.amount)}</span>
+      key: 'amount', header: 'Amount', width: '110px', align: 'right',
+      render: (l) => l.amount !== null ? (
+        <span className="font-semibold text-gray-900">
+          <Money minor={l.amount} currency={l.currency} showTicker={false} />
+        </span>
       ) : (
-        <span className="text-gray-400 text-sm">Custom</span>
+        <span className="text-gray-400 text-sm">Customer chooses</span>
       ),
+    },
+    {
+      key: 'currency', header: 'Currency', width: '90px',
+      render: (l) => <CoinBadge currency={l.currency} size="sm" />,
     },
     {
       key: 'status', header: 'Status', width: '90px',
@@ -75,8 +123,12 @@ export default function PaymentLinksPage() {
       render: (l) => <span className="text-sm text-gray-600">{l.payment_count}</span>,
     },
     {
-      key: 'collected', header: 'Collected', width: '100px', align: 'right',
-      render: (l) => <span className="font-semibold text-gray-900">{formatUSDC(l.total_collected)}</span>,
+      key: 'collected', header: 'Collected', width: '110px', align: 'right',
+      render: (l) => (
+        <span className="font-semibold text-gray-900">
+          <Money minor={l.total_collected} currency={l.currency} showTicker={false} />
+        </span>
+      ),
     },
     {
       key: 'actions', header: '', width: '110px', align: 'right',
@@ -97,8 +149,6 @@ export default function PaymentLinksPage() {
     },
   ];
 
-  const allChains: Chain[] = ['base', 'ethereum', 'polygon', 'arbitrum', 'optimism'];
-
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -114,7 +164,7 @@ export default function PaymentLinksPage() {
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
         <DataTable
           columns={columns}
-          data={mockPaymentLinks}
+          data={links}
           keyExtractor={(l) => l.id}
           emptyMessage="No payment links yet"
           emptyAction={
@@ -142,7 +192,7 @@ export default function PaymentLinksPage() {
               <button onClick={closeCreate} className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50">Cancel</button>
               <button
                 onClick={handleCreate}
-                disabled={!name}
+                disabled={!name || selectedChains.length === 0}
                 className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
               >
                 Create link
@@ -175,23 +225,54 @@ export default function PaymentLinksPage() {
               <label className="text-sm font-medium text-gray-700">Name</label>
               <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g., Pro Plan" className="w-full mt-1 px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
+
             <div>
-              <label className="text-sm font-medium text-gray-700">Amount (USDC) - leave blank for custom</label>
-              <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00" className="w-full mt-1 px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              <label className="text-sm font-medium text-gray-700">Currency</label>
+              <CurrencySelect value={currency} onChange={changeCurrency} className="mt-1.5" />
+              <CurrencyHint currency={currency} />
             </div>
+
+            <div>
+              <label className="text-sm font-medium text-gray-700">
+                Amount in {coin.symbol} — leave blank to let the customer choose
+              </label>
+              <div className="relative mt-1">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-gray-400">
+                  {coin.sign}
+                </span>
+                <input
+                  type="number"
+                  value={amount}
+                  onChange={e => setAmount(e.target.value)}
+                  step={coin.precision === 0 ? '1' : '0.01'}
+                  min="0"
+                  placeholder={coin.precision === 0 ? '0' : '0.00'}
+                  className="w-full pl-7 pr-16 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-gray-400">
+                  {coin.symbol}
+                </span>
+              </div>
+            </div>
+
             <div>
               <label className="text-sm font-medium text-gray-700">Accepted Networks</label>
               <div className="flex flex-wrap gap-2 mt-2">
-                {allChains.map(c => (
+                {coin.networks.map(c => (
                   <button
                     key={c}
-                    onClick={() => setSelectedChains(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c])}
+                    onClick={() => setSelectedChains(prev =>
+                      prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c])}
                     className={`px-3 py-1.5 rounded-lg border text-sm font-medium ${selectedChains.includes(c) ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
                   >
                     <ChainBadge chain={c} />
                   </button>
                 ))}
               </div>
+              <p className="mt-1.5 text-[11px] text-gray-400">
+                Only networks {coin.symbol} settles on are shown.
+                {selectedChains.length === 0 && ' Pick at least one.'}
+              </p>
             </div>
           </div>
         )}
