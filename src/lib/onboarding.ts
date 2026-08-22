@@ -13,6 +13,16 @@ import type { Chain, Currency } from '@/types';
 
 export type OnboardingStepId = 'profile' | 'wallet' | 'currencies' | 'test';
 
+/**
+ * How the merchant's settlement wallet came to exist.
+ *
+ * 'managed' is a wallet we provision for them. It is user-controlled MPC: the
+ * key is split so that no single party — including us — can move funds alone.
+ * That distinction is what keeps the non-custodial claim in the Terms honest,
+ * so it must not quietly become a developer-controlled wallet.
+ */
+export type WalletMode = 'managed' | 'external';
+
 export interface OnboardingStep {
   id: OnboardingStepId;
   title: string;
@@ -35,7 +45,7 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
     id: 'wallet',
     title: 'Where should your money go?',
     short: 'Wallet',
-    description: 'Payments settle straight to a wallet you control. We never hold your funds.',
+    description: 'We can create one for you, or you can connect a wallet you already use.',
     required: true,
   },
   {
@@ -60,8 +70,13 @@ export interface OnboardingState {
   businessName: string;
   businessUrl: string;
   businessType: string;
+  walletMode: WalletMode | null;
   walletAddress: string;
   walletChain: Chain;
+  /** Set when we provision a managed wallet. */
+  walletCreatedAt: string | null;
+  /** The merchant confirmed they understand recovery is on them. */
+  recoveryAcknowledged: boolean;
   currencies: Currency[];
   networks: Chain[];
   testPaymentTxHash: string | null;
@@ -76,8 +91,11 @@ export const EMPTY_ONBOARDING: OnboardingState = {
   businessName: '',
   businessUrl: '',
   businessType: '',
+  walletMode: null,
   walletAddress: '',
   walletChain: 'base',
+  walletCreatedAt: null,
+  recoveryAcknowledged: false,
   currencies: ['USDC'],
   networks: ['base'],
   testPaymentTxHash: null,

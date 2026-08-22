@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   Zap, Check, ArrowRight, ArrowLeft, Wallet, Loader2, ShieldCheck,
-  AlertTriangle, Sparkles, ExternalLink, Copy, PartyPopper,
+  AlertTriangle, Sparkles, ExternalLink, Copy, PartyPopper, KeyRound,
+  Plug, RefreshCw,
 } from 'lucide-react';
 import { ChainBadge } from '@/components/ui/chain-badge';
 import { CoinMark } from '@/components/ui/coin-badge';
@@ -14,6 +15,7 @@ import { STABLECOIN_LIST, STABLECOINS, formatAmount } from '@/lib/currencies';
 import { truncateAddress, getExplorerUrl } from '@/lib/utils';
 import {
   useOnboarding, ONBOARDING_STEPS, BUSINESS_TYPES, isReadyForPayments,
+  type WalletMode,
 } from '@/lib/onboarding';
 import type { Chain, Currency } from '@/types';
 
@@ -33,6 +35,7 @@ export default function OnboardingPage() {
   const [stepIndex, setStepIndex] = useState(firstIncomplete === -1 ? 0 : firstIncomplete);
   const [testing, setTesting] = useState(false);
   const [finishing, setFinishing] = useState(false);
+  const [creatingWallet, setCreatingWallet] = useState(false);
 
   const step = ONBOARDING_STEPS[stepIndex];
   const isLast = stepIndex === ONBOARDING_STEPS.length - 1;
@@ -49,7 +52,12 @@ export default function OnboardingPage() {
 
   const canContinue = () => {
     if (step.id === 'profile') return state.businessName.trim().length > 0;
-    if (step.id === 'wallet') return walletValid;
+    // A managed wallet also needs the recovery caveat acknowledged, since
+    // losing access to it is not something we can undo.
+    if (step.id === 'wallet') {
+      if (state.walletMode === 'managed') return walletValid && state.recoveryAcknowledged;
+      return state.walletMode === 'external' && walletValid;
+    }
     if (step.id === 'currencies') return state.currencies.length > 0 && state.networks.length > 0;
     return true;
   };
@@ -87,6 +95,28 @@ export default function OnboardingPage() {
         ? state.networks.filter(x => x !== n)
         : [...state.networks, n],
     });
+  };
+
+  /** Provisions a user-controlled MPC wallet. */
+  const createManagedWallet = () => {
+    setCreatingWallet(true);
+    patch({ walletMode: 'managed' });
+    setTimeout(() => {
+      const hex = Array.from({ length: 40 }, () => '0123456789abcdef'[Math.floor(Math.random() * 16)]).join('');
+      patch({
+        walletAddress: `0x${hex}`,
+        walletCreatedAt: new Date().toISOString(),
+        walletChain: state.networks[0] ?? 'base',
+      });
+      setCreatingWallet(false);
+      toast('Wallet created');
+    }, 1800);
+  };
+
+  const chooseMode = (mode: WalletMode) => {
+    // Switching modes discards the other path's address so the two never mix.
+    patch({ walletMode: mode, walletAddress: '', walletCreatedAt: null, recoveryAcknowledged: false });
+    if (mode === 'managed') createManagedWallet();
   };
 
   const runTestPayment = () => {
@@ -224,44 +254,186 @@ export default function OnboardingPage() {
           {/* --- Wallet --- */}
           {step.id === 'wallet' && (
             <div className="animate-fade-in">
-              <div className="mb-5 flex items-start gap-2.5 rounded-xl border border-blue-100 bg-blue-50/70 px-4 py-3">
-                <ShieldCheck size={16} className="mt-0.5 shrink-0 text-blue-600" />
-                <p className="text-[13px] leading-relaxed text-blue-900">
-                  Payments go straight from your customer&apos;s wallet to this address. We never
-                  take custody, so there is no balance with us to withdraw.
-                </p>
-              </div>
+              {/* Choice of how to get a wallet */}
+              {!state.walletMode && (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <button
+                    onClick={() => chooseMode('managed')}
+                    className="group rounded-xl border border-gray-200 p-5 text-left transition-all hover:border-blue-400 hover:shadow-sm"
+                  >
+                    <div className="mb-3 flex items-center justify-between">
+                      <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50">
+                        <Sparkles size={17} className="text-blue-600" />
+                      </span>
+                      <span className="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
+                        Recommended
+                      </span>
+                    </div>
+                    <h2 className="text-sm font-semibold text-gray-900">Create one for me</h2>
+                    <p className="mt-1.5 text-[13px] leading-relaxed text-gray-500">
+                      We&apos;ll set up a wallet in a few seconds. Nothing to install, no seed
+                      phrase to write down.
+                    </p>
+                    <span className="mt-3 inline-flex items-center gap-1.5 text-[13px] font-medium text-blue-600">
+                      Create wallet
+                      <ArrowRight size={13} className="transition-transform group-hover:translate-x-0.5" />
+                    </span>
+                  </button>
 
-              <label htmlFor="wallet" className={label}>Settlement wallet address</label>
-              <input
-                id="wallet"
-                value={state.walletAddress}
-                onChange={e => patch({ walletAddress: e.target.value })}
-                placeholder="0x…"
-                autoFocus
-                className={`${field} font-mono`}
-              />
-              {state.walletAddress && !walletValid && (
-                <p className="mt-1.5 text-[12px] text-red-500">
-                  That doesn&apos;t look like a valid address — it should start with 0x and be 42
-                  characters long.
-                </p>
+                  <button
+                    onClick={() => chooseMode('external')}
+                    className="group rounded-xl border border-gray-200 p-5 text-left transition-all hover:border-gray-300 hover:shadow-sm"
+                  >
+                    <div className="mb-3">
+                      <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100">
+                        <Plug size={17} className="text-gray-600" />
+                      </span>
+                    </div>
+                    <h2 className="text-sm font-semibold text-gray-900">Use my own wallet</h2>
+                    <p className="mt-1.5 text-[13px] leading-relaxed text-gray-500">
+                      Connect an existing wallet or paste an address — best if you already have a
+                      treasury setup.
+                    </p>
+                    <span className="mt-3 inline-flex items-center gap-1.5 text-[13px] font-medium text-gray-700">
+                      Connect wallet
+                      <ArrowRight size={13} className="transition-transform group-hover:translate-x-0.5" />
+                    </span>
+                  </button>
+                </div>
               )}
 
-              <button
-                onClick={() => patch({ walletAddress: '0x7777777777777777777777777777777777777777' })}
-                className="mt-3 inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-[13px] font-medium text-gray-700 transition-colors hover:border-gray-300 hover:bg-gray-50"
-              >
-                <Wallet size={14} /> Connect a wallet instead
-              </button>
+              {/* Provisioning */}
+              {state.walletMode === 'managed' && creatingWallet && (
+                <div className="rounded-xl border border-gray-200 bg-gray-50/70 px-6 py-10 text-center">
+                  <Loader2 size={26} className="mx-auto mb-3 animate-spin text-blue-600" />
+                  <p className="text-sm font-semibold text-gray-900">Creating your wallet…</p>
+                  <p className="mt-1 text-[13px] text-gray-500">
+                    Generating keys and securing them to your account.
+                  </p>
+                </div>
+              )}
 
-              <div className="mt-5 flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3">
-                <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-600" />
-                <p className="text-[13px] leading-relaxed text-amber-900">
-                  Use a wallet you control the keys to — not an exchange deposit address. Exchanges
-                  often reject unexpected transfers, and funds sent there can be unrecoverable.
-                </p>
-              </div>
+              {/* Managed wallet ready */}
+              {state.walletMode === 'managed' && !creatingWallet && walletValid && (
+                <div>
+                  <div className="rounded-xl border border-green-200 bg-green-50/70 p-5">
+                    <div className="flex items-start gap-3">
+                      <Check size={18} className="mt-0.5 shrink-0 text-green-600" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold text-green-900">Your wallet is ready</p>
+                        <p className="mt-1 text-[13px] leading-relaxed text-green-800">
+                          Payments will settle here. You can add more wallets later from Settings.
+                        </p>
+                        <div className="mt-3 flex items-center gap-2 rounded-lg border border-green-200 bg-white px-3 py-2">
+                          <span className="min-w-0 flex-1 truncate font-mono text-[12.5px] text-gray-800">
+                            {state.walletAddress}
+                          </span>
+                          <button
+                            onClick={() => { navigator.clipboard.writeText(state.walletAddress); toast('Address copied'); }}
+                            title="Copy address"
+                            className="shrink-0 text-gray-400 hover:text-gray-700"
+                          >
+                            <Copy size={13} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Who actually controls it */}
+                  <div className="mt-4 rounded-xl border border-gray-200 p-5">
+                    <div className="flex items-center gap-2">
+                      <KeyRound size={15} className="text-gray-400" />
+                      <h3 className="text-sm font-semibold text-gray-900">Who controls this wallet</h3>
+                    </div>
+                    <ul className="mt-3 space-y-2">
+                      {[
+                        'The signing key is split between your account and your device. No single party holds a complete key — including us.',
+                        'We cannot move your funds, freeze them, or sign on your behalf.',
+                        'You can export the wallet or move to your own at any time.',
+                      ].map(t => (
+                        <li key={t} className="flex gap-2.5 text-[13px] leading-relaxed text-gray-600">
+                          <ShieldCheck size={14} className="mt-0.5 shrink-0 text-green-600" />
+                          {t}
+                        </li>
+                      ))}
+                    </ul>
+
+                    <label className="mt-4 flex cursor-pointer items-start gap-2.5 rounded-lg border border-amber-200 bg-amber-50/70 p-3.5">
+                      <input
+                        type="checkbox"
+                        checked={state.recoveryAcknowledged}
+                        onChange={e => patch({ recoveryAcknowledged: e.target.checked })}
+                        className="mt-0.5 h-4 w-4 shrink-0 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-[13px] leading-relaxed text-amber-900">
+                        I understand that if I lose access to my account and my recovery method,
+                        the funds in this wallet cannot be recovered by anyone, including Chain
+                        Payments.
+                      </span>
+                    </label>
+                  </div>
+
+                  <button
+                    onClick={() => chooseMode('external')}
+                    className="mt-4 text-[13px] font-medium text-gray-500 transition-colors hover:text-gray-800"
+                  >
+                    Use my own wallet instead
+                  </button>
+                </div>
+              )}
+
+              {/* External wallet */}
+              {state.walletMode === 'external' && (
+                <div>
+                  <div className="mb-5 flex items-start gap-2.5 rounded-xl border border-blue-100 bg-blue-50/70 px-4 py-3">
+                    <ShieldCheck size={16} className="mt-0.5 shrink-0 text-blue-600" />
+                    <p className="text-[13px] leading-relaxed text-blue-900">
+                      Payments go straight from your customer&apos;s wallet to this address. We
+                      never take custody, so there is no balance with us to withdraw.
+                    </p>
+                  </div>
+
+                  <label htmlFor="wallet" className={label}>Settlement wallet address</label>
+                  <input
+                    id="wallet"
+                    value={state.walletAddress}
+                    onChange={e => patch({ walletAddress: e.target.value })}
+                    placeholder="0x…"
+                    autoFocus
+                    className={`${field} font-mono`}
+                  />
+                  {state.walletAddress && !walletValid && (
+                    <p className="mt-1.5 text-[12px] text-red-500">
+                      That doesn&apos;t look like a valid address — it should start with 0x and be
+                      42 characters long.
+                    </p>
+                  )}
+
+                  <button
+                    onClick={() => patch({ walletAddress: '0x7777777777777777777777777777777777777777' })}
+                    className="mt-3 inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-[13px] font-medium text-gray-700 transition-colors hover:border-gray-300 hover:bg-gray-50"
+                  >
+                    <Wallet size={14} /> Connect a wallet
+                  </button>
+
+                  <div className="mt-5 flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3">
+                    <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-600" />
+                    <p className="text-[13px] leading-relaxed text-amber-900">
+                      Use a wallet you control the keys to — not an exchange deposit address.
+                      Exchanges often reject unexpected transfers, and funds sent there can be
+                      unrecoverable.
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() => chooseMode('managed')}
+                    className="mt-4 inline-flex items-center gap-1.5 text-[13px] font-medium text-gray-500 transition-colors hover:text-gray-800"
+                  >
+                    <RefreshCw size={13} /> Create a wallet for me instead
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
