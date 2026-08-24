@@ -1,7 +1,9 @@
 'use client';
 
-import { useState } from 'react';
-import { Key, Webhook, ScrollText, Plus, Copy, Eye, EyeOff, Trash2, Check, X } from 'lucide-react';
+import { Suspense, useState } from 'react';
+import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
+import { Key, Webhook, ScrollText, TestTube, BookOpen, Plus, Copy, Trash2, Check, X } from 'lucide-react';
 import { StatusPill } from '@/components/ui/status-pill';
 import { DataTable, type Column } from '@/components/ui/data-table';
 import { Modal } from '@/components/ui/modal';
@@ -9,25 +11,46 @@ import { useToast } from '@/components/ui/toast';
 import { formatRelativeTime } from '@/lib/utils';
 import { mockApiKeys, mockWebhooks, mockWebhookLogs } from '@/lib/mock-data';
 import { useCollection, newId } from '@/lib/use-collection';
+import { WEBHOOK_EVENTS } from '@/lib/developer-content';
+import { SandboxPanel } from './sandbox';
 import type { ApiKey, WebhookEndpoint, WebhookLog } from '@/types';
 
 const sectionTabs = [
+  { key: 'sandbox', label: 'Sandbox', icon: TestTube },
   { key: 'api-keys', label: 'API Keys', icon: Key },
   { key: 'webhooks', label: 'Webhooks', icon: Webhook },
   { key: 'logs', label: 'Event Logs', icon: ScrollText },
 ] as const;
 
+const TAB_KEYS = sectionTabs.map(t => t.key) as readonly string[];
+
 export default function DeveloperPage() {
+  return (
+    // useSearchParams needs a Suspense boundary to keep the route statically
+    // renderable rather than forcing the whole page dynamic.
+    <Suspense fallback={null}>
+      <DeveloperConsole />
+    </Suspense>
+  );
+}
+
+function DeveloperConsole() {
   const { toast } = useToast();
+  const searchParams = useSearchParams();
   const { items: apiKeys, add: addApiKey } = useCollection<ApiKey>('api-keys', mockApiKeys);
   const { items: webhooks, add: addWebhook } = useCollection<WebhookEndpoint>('webhooks', mockWebhooks);
-  const [activeSection, setActiveSection] = useState<string>('api-keys');
-  const [showSecret, setShowSecret] = useState<Record<string, boolean>>({});
+
+  // Docs deep-link into a specific tab, e.g. /dashboard/developer?tab=sandbox.
+  const requested = searchParams.get('tab');
+  const [override, setOverride] = useState<string | null>(null);
+  const activeSection = override ?? (requested && TAB_KEYS.includes(requested) ? requested : 'sandbox');
+  const setActiveSection = setOverride;
   const [createKeyOpen, setCreateKeyOpen] = useState(false);
   const [createWebhookOpen, setCreateWebhookOpen] = useState(false);
   const [keyName, setKeyName] = useState('');
   const [keyMode, setKeyMode] = useState<'test' | 'live'>('test');
   const [webhookUrl, setWebhookUrl] = useState('');
+  const [selectedEvents, setSelectedEvents] = useState<string[]>(['payment.succeeded']);
 
   const apiKeyColumns: Column<ApiKey>[] = [
     {
@@ -123,11 +146,27 @@ export default function DeveloperPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-xl font-bold text-gray-900">Developer Console</h1>
-        <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-lg">
-          <div className="w-2 h-2 rounded-full bg-amber-400" />
-          <span className="text-xs font-medium text-amber-700">Test Mode</span>
+      <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">Developer Console</h1>
+          <p className="text-sm text-gray-500 mt-0.5">
+            Keys, webhooks, and a sandbox to build against.{' '}
+            <Link href="/developers" className="text-blue-600 hover:underline">
+              Read the docs
+            </Link>
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/developers"
+            className="inline-flex items-center gap-1.5 px-3 h-9 rounded-lg border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            <BookOpen size={14} /> Docs
+          </Link>
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-lg">
+            <div className="w-2 h-2 rounded-full bg-amber-400" />
+            <span className="text-xs font-medium text-amber-700">Test Mode</span>
+          </div>
         </div>
       </div>
 
@@ -145,6 +184,9 @@ export default function DeveloperPage() {
           </button>
         ))}
       </div>
+
+      {/* Sandbox */}
+      {activeSection === 'sandbox' && <SandboxPanel />}
 
       {/* API Keys */}
       {activeSection === 'api-keys' && (
@@ -246,17 +288,18 @@ export default function DeveloperPage() {
               addWebhook({
                 id: newId('we'),
                 url: webhookUrl,
-                events: ['payment.succeeded'],
+                events: selectedEvents,
                 active: true,
                 secret: `whsec_${Math.random().toString(36).slice(2, 14)}`,
                 created_at: new Date().toISOString(),
                 last_delivery_at: null,
                 success_rate: 100,
               });
-              toast('Webhook endpoint added');
+              toast(`Endpoint added for ${selectedEvents.length} event${selectedEvents.length === 1 ? '' : 's'}`);
               setCreateWebhookOpen(false);
               setWebhookUrl('');
-            }} disabled={!webhookUrl} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg disabled:opacity-50">Add endpoint</button>
+              setSelectedEvents(['payment.succeeded']);
+            }} disabled={!webhookUrl || selectedEvents.length === 0} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg disabled:opacity-50">Add endpoint</button>
           </div>
         }
       >
@@ -266,12 +309,26 @@ export default function DeveloperPage() {
             <input value={webhookUrl} onChange={e => setWebhookUrl(e.target.value)} placeholder="https://api.example.com/webhooks" className="w-full mt-1 px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
           <div>
-            <label className="text-sm font-medium text-gray-700">Events to listen to</label>
-            <div className="mt-2 space-y-2">
-              {['payment.succeeded', 'payment.failed', 'refund.created', 'refund.completed', 'invoice.paid'].map(evt => (
-                <label key={evt} className="flex items-center gap-2">
-                  <input type="checkbox" defaultChecked className="rounded" />
-                  <code className="text-xs font-mono text-gray-600">{evt}</code>
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium text-gray-700">Events to listen to</label>
+              <span className="text-[11px] text-gray-400">{selectedEvents.length} selected</span>
+            </div>
+            <div className="mt-2 max-h-56 overflow-y-auto rounded-lg border border-gray-200 divide-y divide-gray-50">
+              {WEBHOOK_EVENTS.map(evt => (
+                <label key={evt.type} className="flex items-start gap-2.5 px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={selectedEvents.includes(evt.type)}
+                    onChange={() => setSelectedEvents(prev =>
+                      prev.includes(evt.type)
+                        ? prev.filter(t => t !== evt.type)
+                        : [...prev, evt.type])}
+                    className="mt-0.5 rounded"
+                  />
+                  <span className="min-w-0">
+                    <code className="text-xs font-mono text-gray-700">{evt.type}</code>
+                    <span className="block text-[11px] leading-relaxed text-gray-400">{evt.description}</span>
+                  </span>
                 </label>
               ))}
             </div>

@@ -5,6 +5,7 @@ import type { Chain } from '@/types';
 type PayoutStatus = 'pending' | 'processing' | 'completed' | 'failed';
 
 const VALID_STATUSES: PayoutStatus[] = ['pending', 'processing', 'completed', 'failed'];
+const VALID_CHAINS: Chain[] = ['base', 'ethereum', 'polygon', 'arbitrum', 'optimism'];
 
 interface Payout {
   id: string;
@@ -129,6 +130,15 @@ export async function POST(request: NextRequest) {
   if (typeof amount !== 'number' || amount <= 0 || !Number.isFinite(amount)) {
     return NextResponse.json(
       { error: 'amount must be a positive number' },
+      { status: 400 }
+    );
+  }
+
+  // Optional, but validated when supplied — an unrecognised network would
+  // otherwise be stored verbatim and the payout could never settle.
+  if (chain !== undefined && chain !== null && !VALID_CHAINS.includes(chain as Chain)) {
+    return NextResponse.json(
+      { error: `Invalid chain. Must be one of: ${VALID_CHAINS.join(', ')}` },
       { status: 400 }
     );
   }
