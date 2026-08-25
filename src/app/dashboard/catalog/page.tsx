@@ -12,6 +12,7 @@ import { Modal } from '@/components/ui/modal';
 import { useToast } from '@/components/ui/toast';
 import { formatUSDC, formatRelativeTime } from '@/lib/utils';
 import { STABLECOIN_LIST, getCoin, formatAmount, toUsdCents } from '@/lib/currencies';
+import { useCurrencySettings } from '@/lib/currency-settings';
 import { mockCatalogItems, mockCatalogCategories } from '@/lib/mock-data';
 import { useCollection, newId } from '@/lib/use-collection';
 import type { CatalogItem, CatalogCategory, Currency, CategoryAccent } from '@/types';
@@ -56,6 +57,7 @@ export default function CatalogPage() {
   const [fCategory, setFCategory] = useState(mockCatalogCategories[0]?.id ?? '');
   const [fPrice, setFPrice] = useState('');
   const [fCurrency, setFCurrency] = useState<Currency>('USDC');
+  const { settings: currencySettings } = useCurrencySettings();
   const [fUnit, setFUnit] = useState('each');
 
   // Category form
@@ -111,7 +113,7 @@ export default function CatalogPage() {
     setEditing(null);
     setFName(''); setFDesc(''); setFSku(''); setFType('product');
     setFCategory(categories[0]?.id ?? ''); setFPrice('');
-    setFCurrency('USDC'); setFUnit('each');
+    setFCurrency(currencySettings.defaultCurrency); setFUnit('each');
     setItemModalOpen(true);
   };
 
@@ -567,10 +569,24 @@ export default function CatalogPage() {
                 onChange={e => setFCurrency(e.target.value as Currency)}
                 className={field}
               >
-                {STABLECOIN_LIST.map(c => (
-                  <option key={c.symbol} value={c.symbol}>{c.symbol} — {c.name}</option>
-                ))}
+                {/* Only accepted currencies, plus whatever this item is already
+                    priced in — otherwise editing an old item would silently
+                    re-denominate it. */}
+                {STABLECOIN_LIST
+                  .filter(c => currencySettings.enabled.includes(c.symbol) || c.symbol === fCurrency)
+                  .map(c => (
+                    <option key={c.symbol} value={c.symbol}>
+                      {c.symbol} — {c.name}
+                      {currencySettings.enabled.includes(c.symbol) ? '' : ' (not accepted)'}
+                    </option>
+                  ))}
               </select>
+              {!currencySettings.enabled.includes(fCurrency) && (
+                <p className="mt-1 text-[11px] text-amber-600">
+                  You no longer accept {fCurrency}. This item cannot be added to new invoices until
+                  you turn it back on in settings.
+                </p>
+              )}
             </div>
             <div>
               <label className={label}>Unit</label>

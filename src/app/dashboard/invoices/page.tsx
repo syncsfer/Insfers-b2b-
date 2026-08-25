@@ -15,6 +15,7 @@ import { useCollection, newId } from '@/lib/use-collection';
 import type { Invoice, InvoiceItem, Currency } from '@/types';
 import { formatAmount } from '@/lib/currencies';
 import { CurrencySelect, CurrencyHint } from '@/components/ui/currency-select';
+import { useCurrencySettings } from '@/lib/currency-settings';
 import { CategoryBadge } from '@/components/ui/category-badge';
 
 const tabs = [
@@ -33,10 +34,15 @@ export default function InvoicesPage() {
   const [email, setEmail] = useState('');
   const [description, setDescription] = useState('');
   const [dueDate, setDueDate] = useState('');
-  const [invoiceCurrency, setInvoiceCurrency] = useState<Currency>('USDC');
+  // null until picked, so the form follows the accepted default once settings hydrate.
+  const [pickedCurrency, setPickedCurrency] = useState<Currency | null>(null);
   const [createdInvoice, setCreatedInvoice] = useState<{ id: string; url: string } | null>(null);
 
   const { items: invoices, add: addInvoice } = useCollection<Invoice>('invoices', mockInvoices);
+  const { settings } = useCurrencySettings();
+  const invoiceCurrency = pickedCurrency && settings.enabled.includes(pickedCurrency)
+    ? pickedCurrency
+    : settings.defaultCurrency;
 
   // Catalog-backed line items — the point of the catalog is not retyping these.
   const [lineItems, setLineItems] = useState<{ itemId: string; quantity: number }[]>([]);
@@ -86,7 +92,7 @@ export default function InvoicesPage() {
    * count toward the total.
    */
   const changeCurrency = (next: Currency) => {
-    setInvoiceCurrency(next);
+    setPickedCurrency(next);
     setLineItems(prev => prev.filter(l => catalogById.get(l.itemId)?.currency === next));
   };
 
@@ -140,7 +146,7 @@ export default function InvoicesPage() {
     setEmail('');
     setDescription('');
     setDueDate('');
-    setInvoiceCurrency('USDC');
+    setPickedCurrency(null);
     setLineItems([]);
     setCatalogSearch('');
   };

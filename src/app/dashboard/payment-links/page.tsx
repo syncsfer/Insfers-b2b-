@@ -12,7 +12,8 @@ import { Modal } from '@/components/ui/modal';
 import { useToast } from '@/components/ui/toast';
 import { mockPaymentLinks } from '@/lib/mock-data';
 import { useCollection, newId } from '@/lib/use-collection';
-import { STABLECOINS, getCoin } from '@/lib/currencies';
+import { getCoin } from '@/lib/currencies';
+import { useCurrencySettings, acceptedNetworks } from '@/lib/currency-settings';
 import type { PaymentLink, Chain, Currency } from '@/types';
 
 export default function PaymentLinksPage() {
@@ -20,13 +21,24 @@ export default function PaymentLinksPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
-  const [currency, setCurrency] = useState<Currency>('USDC');
-  const [selectedChains, setSelectedChains] = useState<Chain[]>(['base']);
   const [createdLink, setCreatedLink] = useState<{ id: string; url: string } | null>(null);
 
   const { items: links, add: addLink } = useCollection<PaymentLink>('payment-links', mockPaymentLinks);
+  const { settings } = useCurrencySettings();
+
+  // null until the merchant picks — lets the form follow the accepted default
+  // even though settings hydrate from localStorage after first render.
+  const [pickedCurrency, setPickedCurrency] = useState<Currency | null>(null);
+  const currency = pickedCurrency && settings.enabled.includes(pickedCurrency)
+    ? pickedCurrency
+    : settings.defaultCurrency;
+  const [pickedChains, setPickedChains] = useState<Chain[] | null>(null);
 
   const coin = getCoin(currency);
+  /** Networks this coin settles on that the merchant also accepts. */
+  const chainOptions = acceptedNetworks(settings, currency);
+  const selectedChains = (pickedChains ?? []).filter(c => chainOptions.includes(c));
+  const effectiveChains = selectedChains.length ? selectedChains : chainOptions.slice(0, 1);
 
   /**
    * A coin only exists on some networks, so switching currency has to prune any
@@ -34,10 +46,11 @@ export default function PaymentLinksPage() {
    * rather than leaving the link with nowhere to settle.
    */
   const changeCurrency = (next: Currency) => {
-    setCurrency(next);
-    setSelectedChains(prev => {
-      const kept = prev.filter(c => STABLECOINS[next].networks.includes(c));
-      return kept.length > 0 ? kept : [STABLECOINS[next].networks[0]];
+    setPickedCurrency(next);
+    setPickedChains(prev => {
+      const allowed = acceptedNetworks(settings, next);
+      const kept = (prev ?? []).filter(c => allowed.includes(c));
+      return kept.length > 0 ? kept : allowed.slice(0, 1);
     });
   };
 
@@ -55,7 +68,7 @@ export default function PaymentLinksPage() {
       currency,
       url,
       active: true,
-      chains: selectedChains,
+      chains: effectiveChains,
       payment_count: 0,
       total_collected: 0,
       created_at: new Date().toISOString(),
@@ -73,8 +86,8 @@ export default function PaymentLinksPage() {
     setCreatedLink(null);
     setName('');
     setAmount('');
-    setCurrency('USDC');
-    setSelectedChains(['base']);
+    setPickedCurrency(null);
+    setPickedChains(null);
   };
 
   const getPublicUrl = (l: PaymentLink) => {
@@ -192,7 +205,7 @@ export default function PaymentLinksPage() {
               <button onClick={closeCreate} className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50">Cancel</button>
               <button
                 onClick={handleCreate}
-                disabled={!name || selectedChains.length === 0}
+                disabled={!name || effectiveChains.length === 0}
                 className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
               >
                 Create link
@@ -258,20 +271,24 @@ export default function PaymentLinksPage() {
             <div>
               <label className="text-sm font-medium text-gray-700">Accepted Networks</label>
               <div className="flex flex-wrap gap-2 mt-2">
-                {coin.networks.map(c => (
+                {chainOptions.map(c => (
                   <button
                     key={c}
-                    onClick={() => setSelectedChains(prev =>
-                      prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c])}
-                    className={`px-3 py-1.5 rounded-lg border text-sm font-medium ${selectedChains.includes(c) ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                    onClick={() => setPickedChains(prev => {
+                      const cur = prev ?? effectiveChains;
+                      return cur.includes(c) ? cur.filter(x => x !== c) : [...cur, c];
+                    })}
+                    className={`px-3 py-1.5 rounded-lg border text-sm font-medium ${effectiveChains.includes(c) ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
                   >
                     <ChainBadge chain={c} />
                   </button>
                 ))}
               </div>
               <p className="mt-1.5 text-[11px] text-gray-400">
-                Only networks {coin.symbol} settles on are shown.
-                {selectedChains.length === 0 && ' Pick at least one.'}
+                Networks {coin.symbol} settles on that you accept.{' '}
+                <Link href="/dashboard/settings?tab=currencies" className="text-blue-600 hover:underline">
+                  Change
+                </Link>
               </p>
             </div>
           </div>

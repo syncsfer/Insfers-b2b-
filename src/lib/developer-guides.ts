@@ -675,6 +675,17 @@ function toDecimal(minor, currency) {
           'Anywhere the product sums across currencies it shows ≈ and uses indicative reference rates. Per-currency values are always exact. We never silently convert one currency into another.',
         ],
       },
+      {
+        heading: 'Choosing which ones you accept',
+        body: [
+          'You do not have to take all four. Settings → Currencies turns each one on or off, picks which networks are offered at checkout, and sets the default for anything new.',
+          'Turning a currency off is not retroactive and never touches your balances. Objects already denominated in it keep their currency and keep rendering correctly; you can still send, bridge, and withdraw a balance you hold in a currency you no longer accept. What changes is what a customer can pay in — new payment links, invoices, and catalog prices stop offering it, and an existing payment link in that currency stops taking payment rather than settling into something you switched off.',
+        ],
+        note: {
+          tone: 'info',
+          text: 'At least one currency must stay enabled, and every enabled currency must keep at least one network — otherwise you would have a currency nobody could actually pay you in.',
+        },
+      },
     ],
     next: ['payment-intents', 'reporting'],
   },

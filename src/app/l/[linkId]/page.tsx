@@ -8,6 +8,7 @@ import { useToast } from '@/components/ui/toast';
 import { getCoin, formatAmount } from '@/lib/currencies';
 import { mockPaymentLinks } from '@/lib/mock-data';
 import { useCollection } from '@/lib/use-collection';
+import { useCurrencySettings } from '@/lib/currency-settings';
 import type { Chain, PaymentLink } from '@/types';
 
 export default function PublicPaymentLinkPage({ params }: { params: Promise<{ linkId: string }> }) {
@@ -18,6 +19,7 @@ export default function PublicPaymentLinkPage({ params }: { params: Promise<{ li
   // actually resolves here.
   const { items: links } = useCollection<PaymentLink>('payment-links', mockPaymentLinks);
   const link = links.find(l => l.id === linkId) ?? null;
+  const { settings } = useCurrencySettings();
 
   const [selectedChain, setSelectedChain] = useState<Chain>('base');
   const [customAmount, setCustomAmount] = useState('');
@@ -28,11 +30,17 @@ export default function PublicPaymentLinkPage({ params }: { params: Promise<{ li
   // divisor differs per coin (yen has no subunit).
   const effectiveAmount = link?.amount ?? (customAmount ? Math.round(parseFloat(customAmount) * coin.minorUnits) : 0);
   const isInactive = !!link && !link.active;
+  // The merchant may have stopped accepting this currency since the link was
+  // made. Taking payment in it anyway would settle into a currency they have
+  // turned off, so the link stops working rather than quietly ignoring that.
+  const currencyDropped = !!link && !settings.enabled.includes(link.currency);
+  const usableChains = link ? link.chains.filter(c => settings.networks.includes(c)) : [];
+  const noNetwork = !!link && !currencyDropped && usableChains.length === 0;
   // Falls back to the link's first network until the payer picks one, which
   // also keeps the selection valid if the merchant changes the coin.
-  const activeChain = link && link.chains.includes(selectedChain)
+  const activeChain = usableChains.includes(selectedChain)
     ? selectedChain
-    : link?.chains[0] ?? 'base';
+    : usableChains[0] ?? 'base';
 
   function handlePay() {
     if (!link) return;
@@ -62,16 +70,20 @@ export default function PublicPaymentLinkPage({ params }: { params: Promise<{ li
 
       <div className="flex-1 flex items-start justify-center px-4 pt-10 pb-10">
         <div className="w-full max-w-md">
-          {!link || isInactive ? (
+          {!link || isInactive || currencyDropped || noNetwork ? (
             <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
               <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
                 <AlertCircle size={20} className="text-gray-400" />
               </div>
               <h2 className="text-lg font-semibold text-gray-900">Link unavailable</h2>
               <p className="text-sm text-gray-500 mt-2">
-                {link
-                  ? 'This payment link has been disabled by the merchant.'
-                  : 'We couldn’t find a payment link at this address. Check the URL with whoever sent it.'}
+                {!link
+                  ? 'We couldn’t find a payment link at this address. Check the URL with whoever sent it.'
+                  : currencyDropped
+                    ? `${coin.name} is no longer accepted here. Ask the merchant for a link in a currency they take.`
+                    : noNetwork
+                      ? 'None of this link’s networks are currently accepted. Ask the merchant for an updated link.'
+                      : 'This payment link has been disabled by the merchant.'}
               </p>
             </div>
           ) : (
@@ -118,7 +130,7 @@ export default function PublicPaymentLinkPage({ params }: { params: Promise<{ li
                 <div className="mb-5">
                   <p className="text-xs font-medium text-gray-500 mb-2">Choose network</p>
                   <div className="flex flex-wrap gap-2">
-                    {link.chains.map(c => (
+                    {usableChains.map(c => (
                       <button
                         key={c}
                         onClick={() => setSelectedChain(c)}

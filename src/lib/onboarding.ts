@@ -77,7 +77,13 @@ export interface OnboardingState {
   walletCreatedAt: string | null;
   /** The merchant confirmed they understand recovery is on them. */
   recoveryAcknowledged: boolean;
+  /**
+   * @deprecated Accepted currencies and networks now live in
+   * `currency-settings.ts`, shared with the Settings page. These remain only so
+   * a record stored under the old shape still parses. Read the settings store.
+   */
   currencies: Currency[];
+  /** @deprecated See `currencies`. */
   networks: Chain[];
   testPaymentTxHash: string | null;
   /** Set once they leave onboarding for the dashboard. */

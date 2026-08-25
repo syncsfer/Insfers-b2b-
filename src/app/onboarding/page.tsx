@@ -12,6 +12,7 @@ import { ChainBadge } from '@/components/ui/chain-badge';
 import { CoinMark } from '@/components/ui/coin-badge';
 import { useToast } from '@/components/ui/toast';
 import { STABLECOIN_LIST, STABLECOINS, formatAmount } from '@/lib/currencies';
+import { useCurrencySettings, networksFor } from '@/lib/currency-settings';
 import { truncateAddress, getExplorerUrl } from '@/lib/utils';
 import {
   useOnboarding, ONBOARDING_STEPS, BUSINESS_TYPES, isReadyForPayments,
@@ -29,6 +30,11 @@ export default function OnboardingPage() {
   const router = useRouter();
   const { toast } = useToast();
   const { state, patch, completeStep } = useOnboarding();
+  // Accepted currencies live in one place, shared with Settings — see
+  // `currency-settings.ts`. Onboarding is just the first time they are set.
+  const { settings: currencySettings, patch: patchCurrencies } = useCurrencySettings();
+  const currencies = currencySettings.enabled;
+  const networks = currencySettings.networks;
 
   // Resume where they left off rather than always starting at step 1.
   const firstIncomplete = ONBOARDING_STEPS.findIndex(s => !state.completed.includes(s.id));
@@ -46,9 +52,9 @@ export default function OnboardingPage() {
   /** Networks available given the currencies chosen — the same rule the app uses. */
   const availableNetworks = useMemo(() => {
     const set = new Set<Chain>();
-    state.currencies.forEach(c => STABLECOINS[c].networks.forEach(n => set.add(n)));
+    currencies.forEach(c => STABLECOINS[c].networks.forEach(n => set.add(n)));
     return ALL_CHAINS.filter(c => set.has(c));
-  }, [state.currencies]);
+  }, [currencies]);
 
   const canContinue = () => {
     if (step.id === 'profile') return state.businessName.trim().length > 0;
@@ -58,7 +64,7 @@ export default function OnboardingPage() {
       if (state.walletMode === 'managed') return walletValid && state.recoveryAcknowledged;
       return state.walletMode === 'external' && walletValid;
     }
-    if (step.id === 'currencies') return state.currencies.length > 0 && state.networks.length > 0;
+    if (step.id === 'currencies') return currencies.length > 0 && networks.length > 0;
     return true;
   };
 
@@ -68,33 +74,32 @@ export default function OnboardingPage() {
     setStepIndex(i => i + 1);
   };
 
+  /**
+   * Currency choices go straight to the shared settings store rather than a
+   * copy held here — onboarding and the Settings page must not be able to
+   * disagree about what the merchant accepts.
+   */
   const toggleCurrency = (c: Currency) => {
-    const next = state.currencies.includes(c)
-      ? state.currencies.filter(x => x !== c)
-      : [...state.currencies, c];
+    const next = currencies.includes(c)
+      ? currencies.filter(x => x !== c)
+      : [...currencies, c];
+    if (next.length === 0) return;
 
-    // Drop networks no remaining currency can settle on.
-    const stillValid = new Set<Chain>();
-    next.forEach(cur => STABLECOINS[cur].networks.forEach(n => stillValid.add(n)));
-    let networks = state.networks.filter(n => stillValid.has(n));
-
-    // Swapping currencies can invalidate every selected network — for example
-    // going from USDC on Base to JPYC, which doesn't exist there. Leaving the
-    // selection empty strands the user on a disabled Continue with no hint of
-    // what changed, so seed a sensible default instead.
-    if (networks.length === 0 && next.length > 0) {
-      networks = [STABLECOINS[next[0]].networks[0]];
-    }
-
-    patch({ currencies: next, networks });
+    // Drop networks no remaining currency can settle on. Swapping USDC for
+    // JPYC, say, invalidates Base — leaving the selection empty would strand
+    // the user on a disabled Continue with no hint of what changed.
+    const stillValid = networksFor(next);
+    const kept = networks.filter(n => stillValid.includes(n));
+    patchCurrencies({
+      enabled: next,
+      networks: kept.length > 0 ? kept : stillValid.slice(0, 1),
+    });
   };
 
   const toggleNetwork = (n: Chain) => {
-    patch({
-      networks: state.networks.includes(n)
-        ? state.networks.filter(x => x !== n)
-        : [...state.networks, n],
-    });
+    const next = networks.includes(n) ? networks.filter(x => x !== n) : [...networks, n];
+    if (next.length === 0) return;
+    patchCurrencies({ networks: next });
   };
 
   /** Provisions a user-controlled MPC wallet. */
@@ -106,7 +111,7 @@ export default function OnboardingPage() {
       patch({
         walletAddress: `0x${hex}`,
         walletCreatedAt: new Date().toISOString(),
-        walletChain: state.networks[0] ?? 'base',
+        walletChain: networks[0] ?? 'base',
       });
       setCreatingWallet(false);
       toast('Wallet created');
@@ -443,7 +448,7 @@ export default function OnboardingPage() {
               <label className={label}>Currencies you&apos;ll accept</label>
               <div className="grid grid-cols-2 gap-2.5">
                 {STABLECOIN_LIST.map(c => {
-                  const on = state.currencies.includes(c.symbol);
+                  const on = currencies.includes(c.symbol);
                   return (
                     <button
                       key={c.symbol}
@@ -469,7 +474,7 @@ export default function OnboardingPage() {
               </p>
               <div className="flex flex-wrap gap-2">
                 {availableNetworks.map(n => {
-                  const on = state.networks.includes(n);
+                  const on = networks.includes(n);
                   return (
                     <button
                       key={n}
@@ -485,7 +490,7 @@ export default function OnboardingPage() {
                 })}
               </div>
 
-              {state.currencies.length > 0 && state.networks.length === 0 && (
+              {currencies.length > 0 && networks.length === 0 && (
                 <p className="mt-3 text-[12px] text-red-500">Pick at least one network.</p>
               )}
             </div>
@@ -501,8 +506,8 @@ export default function OnboardingPage() {
                     <div>
                       <p className="text-sm font-semibold text-green-900">Test payment confirmed</p>
                       <p className="mt-1 text-[13px] leading-relaxed text-green-800">
-                        A test payment of {formatAmount(1000, state.currencies[0] ?? 'USDC')}{' '}
-                        {state.currencies[0] ?? 'USDC'} settled to your wallet on test network. No
+                        A test payment of {formatAmount(1000, currencies[0] ?? 'USDC')}{' '}
+                        {currencies[0] ?? 'USDC'} settled to your wallet on test network. No
                         real funds moved.
                       </p>
                       <div className="mt-2.5 flex items-center gap-2">
@@ -516,7 +521,7 @@ export default function OnboardingPage() {
                           <Copy size={12} />
                         </button>
                         <a
-                          href={getExplorerUrl(state.networks[0] ?? 'base', state.testPaymentTxHash)}
+                          href={getExplorerUrl(networks[0] ?? 'base', state.testPaymentTxHash)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-green-600 hover:text-green-800"
@@ -535,7 +540,7 @@ export default function OnboardingPage() {
                     </p>
                     <ul className="mt-3 space-y-2">
                       {[
-                        `We create a test payment for ${formatAmount(1000, state.currencies[0] ?? 'USDC')} ${state.currencies[0] ?? 'USDC'}`,
+                        `We create a test payment for ${formatAmount(1000, currencies[0] ?? 'USDC')} ${currencies[0] ?? 'USDC'}`,
                         `It settles to ${state.walletAddress ? truncateAddress(state.walletAddress) : 'your wallet'} on a test network`,
                         'You see it appear in your payments list, exactly as a real one would',
                       ].map(t => (
@@ -628,11 +633,11 @@ export default function OnboardingPage() {
                   </div>
                   <div className="flex justify-between gap-3">
                     <dt className="text-green-800/70">Currencies</dt>
-                    <dd className="font-medium text-green-900">{state.currencies.join(', ')}</dd>
+                    <dd className="font-medium text-green-900">{currencies.join(', ')}</dd>
                   </div>
                   <div className="flex justify-between gap-3">
                     <dt className="text-green-800/70">Networks</dt>
-                    <dd className="font-medium capitalize text-green-900">{state.networks.join(', ')}</dd>
+                    <dd className="font-medium capitalize text-green-900">{networks.join(', ')}</dd>
                   </div>
                 </dl>
               </div>

@@ -1,13 +1,16 @@
 'use client';
 
-import { useState } from 'react';
-import { Building, Users, Shield, Palette, Save, Mail, Eye } from 'lucide-react';
+import { Suspense, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { Building, Users, Shield, Palette, Save, Mail, Eye, Coins } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
 import { mockReceiptSettings } from '@/lib/mock-data';
 import { TeamSection } from './team-section';
+import { CurrenciesSection } from './currencies-section';
 
 const settingsTabs = [
   { key: 'business', label: 'Business', icon: Building },
+  { key: 'currencies', label: 'Currencies', icon: Coins },
   { key: 'receipts', label: 'Receipts', icon: Mail },
   { key: 'team', label: 'Team', icon: Users },
   { key: 'security', label: 'Security', icon: Shield },
@@ -15,8 +18,26 @@ const settingsTabs = [
 ] as const;
 
 export default function SettingsPage() {
+  return (
+    // useSearchParams needs a Suspense boundary to keep the route statically
+    // renderable rather than forcing the whole page dynamic.
+    <Suspense fallback={null}>
+      <SettingsContent />
+    </Suspense>
+  );
+}
+
+const TAB_KEYS = settingsTabs.map(t => t.key) as readonly string[];
+
+function SettingsContent() {
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState<string>('business');
+  const searchParams = useSearchParams();
+
+  // Other pages deep-link here, e.g. /dashboard/settings?tab=currencies.
+  const requested = searchParams.get('tab');
+  const [override, setOverride] = useState<string | null>(null);
+  const activeTab = override ?? (requested && TAB_KEYS.includes(requested) ? requested : 'business');
+  const setActiveTab = setOverride;
   const [businessName, setBusinessName] = useState('Acme Corp');
   const [businessEmail, setBusinessEmail] = useState('admin@acme.com');
   const [businessUrl, setBusinessUrl] = useState('https://acme.com');
@@ -61,7 +82,9 @@ export default function SettingsPage() {
         </div>
 
         {/* Settings content */}
-        <div className={`flex-1 ${activeTab === 'team' ? 'max-w-4xl' : 'max-w-2xl'}`}>
+        <div className={`flex-1 ${
+          activeTab === 'team' ? 'max-w-4xl' : activeTab === 'currencies' ? 'max-w-3xl' : 'max-w-2xl'
+        }`}>
           {/* Business */}
           {activeTab === 'business' && (
             <div className="bg-white border border-gray-200 rounded-xl p-6">
@@ -285,6 +308,8 @@ export default function SettingsPage() {
           )}
 
           {/* Team */}
+          {activeTab === 'currencies' && <CurrenciesSection />}
+
           {activeTab === 'team' && <TeamSection />}
 
           {/* Security */}

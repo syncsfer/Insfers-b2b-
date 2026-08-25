@@ -1,8 +1,10 @@
 'use client';
 
+import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { CoinMark } from '@/components/ui/coin-badge';
 import { STABLECOIN_LIST, getCoin, type StablecoinSymbol } from '@/lib/currencies';
+import { useCurrencySettings } from '@/lib/currency-settings';
 import type { Currency } from '@/types';
 
 /**
@@ -11,22 +13,36 @@ import type { Currency } from '@/types';
  * Currency is a decision the merchant makes up front, not something inferred
  * from whatever they happen to add first — an invoice or a link settles in one
  * coin, and that coin also decides which networks are available.
+ *
+ * Only currencies the merchant accepts are offered. That filtering lives here
+ * rather than at each call site so a new form cannot accidentally offer a
+ * currency the merchant switched off in settings.
  */
 export function CurrencySelect({
   value,
   onChange,
   /** Disable coins that can't be used here, with a reason shown on hover. */
   isDisabled,
+  /** Show every currency regardless of settings. For settings UI itself. */
+  showAll = false,
   className,
 }: {
   value: Currency;
   onChange: (next: Currency) => void;
   isDisabled?: (symbol: StablecoinSymbol) => string | null;
+  showAll?: boolean;
   className?: string;
 }) {
+  const { settings } = useCurrencySettings();
+  const options = showAll
+    ? STABLECOIN_LIST
+    : STABLECOIN_LIST.filter(c => settings.enabled.includes(c.symbol));
+  const hidden = STABLECOIN_LIST.length - options.length;
+
   return (
+    <>
     <div className={cn('grid grid-cols-2 gap-2', className)}>
-      {STABLECOIN_LIST.map((coin) => {
+      {options.map((coin) => {
         const reason = isDisabled?.(coin.symbol) ?? null;
         const selected = value === coin.symbol;
         return (
@@ -53,6 +69,15 @@ export function CurrencySelect({
         );
       })}
     </div>
+    {hidden > 0 && (
+      <p className="mt-1.5 text-[11px] text-gray-400">
+        {hidden} more {hidden === 1 ? 'currency is' : 'currencies are'} available.{' '}
+        <Link href="/dashboard/settings?tab=currencies" className="text-blue-600 hover:underline">
+          Change what you accept
+        </Link>
+      </p>
+    )}
+    </>
   );
 }
 
