@@ -10,6 +10,8 @@ import { getStatusSummary } from '@/components/ui/status-explainer';
 import { DataTable, type Column } from '@/components/ui/data-table';
 import { Modal } from '@/components/ui/modal';
 import { useToast } from '@/components/ui/toast';
+import { EmailPreviewModal } from '@/components/ui/email-preview-modal';
+import { renderClaimLinkEmail, type ClaimEmailKind } from '@/lib/email';
 import { formatUSDC, formatRelativeTime, formatDate, truncateAddress, getExplorerUrl } from '@/lib/utils';
 import { formatAmount } from '@/lib/currencies';
 import { CoinBadge, Money } from '@/components/ui/coin-badge';
@@ -48,9 +50,23 @@ const EVENT_STYLE: Record<ClaimEvent['type'], { icon: React.ElementType; tone: s
   failed:   { icon: AlertTriangle, tone: 'bg-red-50 text-red-600' },
 };
 
+/**
+ * Which claim email matches this refund's current state — so the preview shows
+ * the message the customer would actually get, not a fixed variant.
+ */
+function claimEmailKind(r: Refund): ClaimEmailKind {
+  if (r.claimed_at) return 'claimed';
+  if (r.claim_expires_at) {
+    const days = (new Date(r.claim_expires_at).getTime() - Date.now()) / 86_400_000;
+    if (days <= 2) return 'expiring';
+  }
+  return r.claim_reminders_sent > 0 ? 'reminder' : 'ready';
+}
+
 export default function RefundsPage() {
   const { toast } = useToast();
   const [claimRefund, setClaimRefund] = useState<Refund | null>(null);
+  const [previewKind, setPreviewKind] = useState<ClaimEmailKind | null>(null);
   const [revoked, setRevoked] = useState<Set<string>>(new Set());
 
   const absoluteClaimUrl = (r: Refund) =>
@@ -367,6 +383,12 @@ export default function RefundsPage() {
               </button>
               <div className="flex gap-3">
                 <button
+                  onClick={() => setPreviewKind(claimEmailKind(claimRefund))}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  <Mail size={14} /> Preview email
+                </button>
+                <button
                   onClick={() => toast(`Reminder sent to ${claimRefund.recipient_email ?? 'the customer'}`)}
                   disabled={!claimRefund.recipient_email}
                   className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
@@ -382,12 +404,22 @@ export default function RefundsPage() {
               </div>
             </div>
           ) : (
-            <button
-              onClick={() => setClaimRefund(null)}
-              className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-            >
-              Close
-            </button>
+            <div className="flex w-full items-center justify-end gap-3">
+              {claimRefund && (
+                <button
+                  onClick={() => setPreviewKind(claimEmailKind(claimRefund))}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  <Mail size={14} /> Preview email
+                </button>
+              )}
+              <button
+                onClick={() => setClaimRefund(null)}
+                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Close
+              </button>
+            </div>
           )
         }
       >
@@ -542,6 +574,20 @@ export default function RefundsPage() {
         })()}
       </Modal>
 
+      <EmailPreviewModal
+        open={!!previewKind && !!claimRefund}
+        onClose={() => setPreviewKind(null)}
+        title="Claim link email"
+        email={
+          previewKind && claimRefund
+            ? renderClaimLinkEmail(
+                claimRefund,
+                previewKind,
+                typeof window !== 'undefined' ? window.location.origin : '',
+              )
+            : null
+        }
+      />
     </div>
   );
 }

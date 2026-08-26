@@ -2,16 +2,18 @@
 
 import { Suspense, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Building, Users, Shield, Palette, Save, Mail, Eye, Coins } from 'lucide-react';
+import { Building, Users, Shield, Palette, Save, Mail, Eye, Coins, Send } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
 import { mockReceiptSettings } from '@/lib/mock-data';
 import { TeamSection } from './team-section';
 import { CurrenciesSection } from './currencies-section';
+import { EmailsSection } from './emails-section';
 
 const settingsTabs = [
   { key: 'business', label: 'Business', icon: Building },
   { key: 'currencies', label: 'Currencies', icon: Coins },
   { key: 'receipts', label: 'Receipts', icon: Mail },
+  { key: 'emails', label: 'Emails', icon: Send },
   { key: 'team', label: 'Team', icon: Users },
   { key: 'security', label: 'Security', icon: Shield },
   { key: 'branding', label: 'Branding', icon: Palette },
@@ -83,7 +85,10 @@ function SettingsContent() {
 
         {/* Settings content */}
         <div className={`flex-1 ${
-          activeTab === 'team' ? 'max-w-4xl' : activeTab === 'currencies' ? 'max-w-3xl' : 'max-w-2xl'
+          activeTab === 'team' ? 'max-w-4xl'
+            : activeTab === 'emails' ? 'max-w-5xl'
+            : activeTab === 'currencies' ? 'max-w-3xl'
+            : 'max-w-2xl'
         }`}>
           {/* Business */}
           {activeTab === 'business' && (
@@ -309,6 +314,19 @@ function SettingsContent() {
 
           {/* Team */}
           {activeTab === 'currencies' && <CurrenciesSection />}
+
+          {activeTab === 'emails' && (
+            <EmailsSection
+              brand={{
+                merchantName: businessName,
+                brandColor: brandColor,
+                logoUrl: logoUrl || null,
+                supportEmail: supportEmail || null,
+                footerMessage: footerMessage || null,
+                postalAddress: null,
+              }}
+            />
+          )}
 
           {activeTab === 'team' && <TeamSection />}
 

@@ -2,13 +2,15 @@
 
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { Plus, Send, Eye, Copy, ExternalLink, CheckCircle2, Bot, Wallet, Package, Search, X } from 'lucide-react';
+import { Plus, Send, Eye, Copy, ExternalLink, CheckCircle2, Bot, Wallet, Package, Search, X, Mail } from 'lucide-react';
 import { StatusPill } from '@/components/ui/status-pill';
 import { CoinBadge, Money } from '@/components/ui/coin-badge';
 import { getStatusSummary } from '@/components/ui/status-explainer';
 import { DataTable, type Column } from '@/components/ui/data-table';
 import { Modal } from '@/components/ui/modal';
 import { useToast } from '@/components/ui/toast';
+import { EmailPreviewModal } from '@/components/ui/email-preview-modal';
+import { renderInvoiceEmail } from '@/lib/email';
 import { formatRelativeTime, formatDate } from '@/lib/utils';
 import { mockInvoices, mockAgents, mockCatalogItems, mockCatalogCategories } from '@/lib/mock-data';
 import { useCollection, newId } from '@/lib/use-collection';
@@ -37,6 +39,7 @@ export default function InvoicesPage() {
   // null until picked, so the form follows the accepted default once settings hydrate.
   const [pickedCurrency, setPickedCurrency] = useState<Currency | null>(null);
   const [createdInvoice, setCreatedInvoice] = useState<{ id: string; url: string } | null>(null);
+  const [previewInvoice, setPreviewInvoice] = useState<Invoice | null>(null);
 
   const { items: invoices, add: addInvoice } = useCollection<Invoice>('invoices', mockInvoices);
   const { settings } = useCurrencySettings();
@@ -224,6 +227,13 @@ export default function InvoicesPage() {
           <Link href={`/i/${inv.id}`} target="_blank" onClick={(e) => e.stopPropagation()} className="p-1.5 rounded-md hover:bg-gray-100 text-gray-400" title="View invoice">
             <Eye size={14} />
           </Link>
+          <button
+            onClick={(e) => { e.stopPropagation(); setPreviewInvoice(inv); }}
+            className="p-1.5 rounded-md hover:bg-gray-100 text-gray-400"
+            title="Preview the email the customer receives"
+          >
+            <Mail size={14} />
+          </button>
           {inv.status === 'draft' && (
             <button onClick={(e) => { e.stopPropagation(); toast('Invoice sent'); }} className="p-1.5 rounded-md hover:bg-gray-100 text-gray-400" title="Send invoice">
               <Send size={14} />
@@ -451,6 +461,22 @@ export default function InvoicesPage() {
           </div>
         )}
       </Modal>
+    <EmailPreviewModal
+        open={!!previewInvoice}
+        onClose={() => setPreviewInvoice(null)}
+        title="Invoice email"
+        email={
+          previewInvoice
+            ? renderInvoiceEmail(
+                previewInvoice,
+                previewInvoice.status === 'paid' ? 'paid'
+                  : previewInvoice.status === 'overdue' ? 'overdue'
+                  : 'sent',
+                typeof window !== 'undefined' ? window.location.origin : '',
+              )
+            : null
+        }
+      />
     </div>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Plus, Copy, ExternalLink, Eye, CheckCircle2 } from 'lucide-react';
+import { Plus, Copy, ExternalLink, Eye, CheckCircle2, Mail } from 'lucide-react';
 import { StatusPill } from '@/components/ui/status-pill';
 import { ChainBadge } from '@/components/ui/chain-badge';
 import { CoinBadge, Money } from '@/components/ui/coin-badge';
@@ -10,6 +10,8 @@ import { CurrencySelect, CurrencyHint } from '@/components/ui/currency-select';
 import { DataTable, type Column } from '@/components/ui/data-table';
 import { Modal } from '@/components/ui/modal';
 import { useToast } from '@/components/ui/toast';
+import { EmailPreviewModal } from '@/components/ui/email-preview-modal';
+import { renderPaymentLinkEmail } from '@/lib/email';
 import { mockPaymentLinks } from '@/lib/mock-data';
 import { useCollection, newId } from '@/lib/use-collection';
 import { getCoin } from '@/lib/currencies';
@@ -22,6 +24,7 @@ export default function PaymentLinksPage() {
   const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
   const [createdLink, setCreatedLink] = useState<{ id: string; url: string } | null>(null);
+  const [emailLink, setEmailLink] = useState<PaymentLink | null>(null);
 
   const { items: links, add: addLink } = useCollection<PaymentLink>('payment-links', mockPaymentLinks);
   const { settings } = useCurrencySettings();
@@ -150,6 +153,13 @@ export default function PaymentLinksPage() {
           <Link href={l.url} target="_blank" onClick={e => e.stopPropagation()} className="p-1.5 rounded-md hover:bg-gray-100 text-gray-400" title="Open link">
             <Eye size={14} />
           </Link>
+          <button
+            onClick={(e) => { e.stopPropagation(); setEmailLink(l); }}
+            className="p-1.5 rounded-md hover:bg-gray-100 text-gray-400"
+            title="Preview the payment request email"
+          >
+            <Mail size={14} />
+          </button>
           <button
             onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(getPublicUrl(l)); toast('Link copied'); }}
             className="p-1.5 rounded-md hover:bg-gray-100 text-gray-400"
@@ -294,6 +304,18 @@ export default function PaymentLinksPage() {
           </div>
         )}
       </Modal>
+    <EmailPreviewModal
+        open={!!emailLink}
+        onClose={() => setEmailLink(null)}
+        title="Payment request email"
+        email={
+          emailLink
+            ? renderPaymentLinkEmail(emailLink, 'customer@example.com', {
+                baseUrl: typeof window !== 'undefined' ? window.location.origin : '',
+              })
+            : null
+        }
+      />
     </div>
   );
 }
